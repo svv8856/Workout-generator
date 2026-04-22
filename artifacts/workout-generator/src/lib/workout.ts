@@ -255,6 +255,29 @@ function isAllowed(
 }
 
 // Рекомендованный вес снаряда (кг) — от веса пользователя, пола, уровня и типа упражнения
+// Возрастной коэффициент силы — пик в 25–35, далее снижение
+// (по данным NSCA / ACSM: ~0.5–1% в год после 35 лет)
+function ageStrengthFactor(age: number): number {
+  if (age < 16) return 0.55;
+  if (age < 18) return 0.7;
+  if (age <= 30) return 1.0;
+  if (age <= 40) return 0.95;
+  if (age <= 50) return 0.87;
+  if (age <= 60) return 0.78;
+  if (age <= 70) return 0.68;
+  return 0.55;
+}
+
+// Возрастной коэффициент метаболизма (BMR падает с возрастом)
+function ageMetabolismFactor(age: number): number {
+  if (age <= 25) return 1.05;
+  if (age <= 35) return 1.0;
+  if (age <= 45) return 0.95;
+  if (age <= 55) return 0.9;
+  if (age <= 65) return 0.85;
+  return 0.8;
+}
+
 function recommendWeight(
   ex: Exercise,
   f: FormData,
@@ -280,8 +303,10 @@ function recommendWeight(
   // Поправка на цель (выносливость / жиросжигание — легче)
   const goal =
     f.goal === "strength" ? 1.0 : f.goal === "endurance" ? 0.75 : 0.85;
+  // Поправка на возраст
+  const ageF = ageStrengthFactor(f.age);
 
-  let lo = base * lvl * gen * goal;
+  let lo = base * lvl * gen * goal * ageF;
   let hi = lo * 1.3;
 
   // Округление до приятных значений
@@ -400,12 +425,42 @@ function videoUrlFor(name: string): string {
   return `https://www.youtube.com/results?search_query=${q}`;
 }
 
-function setsFor(ex: Exercise, level: Level): string {
-  if (ex.cardio) return cardioByLevel[level];
-  if (ex.muscle === "core" && (ex.name === "Планка" || ex.name === "Боковая планка")) {
-    return isometricByLevel[level];
+// Возрастная корректировка объёма тренировки
+function adjustVolumeForAge(base: string, age: number): string {
+  if (age >= 65) {
+    // Снижаем подходы и удлиняем отдых
+    return base
+      .replace(/^5 подходов/, "3 подхода")
+      .replace(/^4 подхода/, "3 подхода")
+      .replace(/12–15 повторений/, "8–10 повторений")
+      .replace(/10–12 повторений/, "8–10 повторений")
+      .replace(/отдых.*30 сек/, "отдых между подходами 90 сек")
+      .replace(/отдых.*45 сек/, "отдых между подходами 90 сек")
+      .replace(/отдых.*60 сек/, "отдых между подходами 90 сек");
   }
-  return setsByLevel[level];
+  if (age >= 55) {
+    return base
+      .replace(/^5 подходов/, "4 подхода")
+      .replace(/12–15 повторений/, "10–12 повторений")
+      .replace(/отдых.*30 сек/, "отдых между подходами 60 сек");
+  }
+  if (age < 16) {
+    // Подростки — без больших весов, акцент на технику
+    return base
+      .replace(/^5 подходов/, "3 подхода")
+      .replace(/^4 подхода/, "3 подхода")
+      .replace(/12–15 повторений/, "10–12 повторений");
+  }
+  return base;
+}
+
+function setsFor(ex: Exercise, level: Level, age: number): string {
+  let base: string;
+  if (ex.cardio) base = cardioByLevel[level];
+  else if (ex.muscle === "core" && (ex.name === "Планка" || ex.name === "Боковая планка"))
+    base = isometricByLevel[level];
+  else base = setsByLevel[level];
+  return adjustVolumeForAge(base, age);
 }
 
 // Перемешивание массива (Fisher–Yates)
@@ -484,53 +539,106 @@ export interface WorkoutResult {
 }
 
 export function generateWorkout(f: FormData): WorkoutResult {
-  const excludeJumps = f.age > 45 && f.weight > 100;
-  const pool = EXERCISES.filter((e) => isAllowed(e, f, excludeJumps));
+  // Прыжковые исключаем для 50+, при весе >100 кг или их сочетании
+  const excludeJumps = f.age >= 50 || f.weight >= 100;
+  // Очень пожилым (70+) и очень тяжёлым (>130) убираем все ударные движения
+  const seniorMode = f.age >= 65;
 
-  // Целевое количество — 5–6 упражнений
-  const target = Math.random() < 0.5 ? 5 : 6;
+  const pool = EXERCISES.filter((e) => {
+    if (!isAllowed(e, f, excludeJumps)) return false;
+    if (seniorMode && (e.cardio || e.muscle === "fullbody")) {
+      // оставляем только мягкие кардио (велотренажёр, эллипсоид, ходьба)
+      const soft = /эллипс|велотрен|беговая|бег.*месте/i.test(e.name);
+      if (e.cardio && !soft) return false;
+    }
+    return true;
+  });
+
+  // Целевое количество упражнений: 5–6, для 65+ снижаем до 4–5
+  const target = seniorMode
+    ? Math.random() < 0.5 ? 4 : 5
+    : Math.random() < 0.5 ? 5 : 6;
   const picked = pickBalanced(pool, f.goal, Math.min(target, pool.length));
 
   const exercises: ExerciseOut[] = picked.map((ex) => ({
     name: ex.name,
-    sets: setsFor(ex, f.level),
+    sets: setsFor(ex, f.level, f.age),
     muscle: muscleLabel[ex.muscle],
     weight: recommendWeight(ex, f),
     cue: cueFor(ex.name),
     videoUrl: videoUrlFor(ex.name),
   }));
 
-  // Калории: вес × 0.075 × минуты × поправка
-  const levelMul = { beginner: 0.9, intermediate: 1, advanced: 1.15 }[f.level];
-  const goalMul = { strength: 1, endurance: 1.1, fatburn: 1.25 }[f.goal];
-  const calories = Math.round(f.weight * 0.075 * f.duration * levelMul * goalMul);
+  // Калории: расчёт по MET-методу (компендиум Ainsworth)
+  // ккал = MET × 3.5 × вес / 200 × минуты
+  // MET для силовой ~4.5, кардио ~7, жиросжигания (HIIT-формат) ~6
+  const baseMET =
+    f.goal === "endurance" ? 7.0 : f.goal === "fatburn" ? 6.0 : 4.5;
+  const levelMul = { beginner: 0.9, intermediate: 1.0, advanced: 1.15 }[f.level];
+  const ageMul = ageMetabolismFactor(f.age);
+  const calories = Math.round(
+    (baseMET * 3.5 * f.weight) / 200 * f.duration * levelMul * ageMul,
+  );
 
   // Сводка по задействованным группам
   const muscles = Array.from(new Set(picked.map((e) => muscleLabel[e.muscle])));
   const summary = muscles.join(" · ");
 
-  // Предупреждения
+  // Предупреждения по возрасту и весу
   const warnings: string[] = [];
-  if (f.age > 60) {
+
+  if (f.age >= 70) {
     warnings.push(
-      "Возраст более 60 лет — начните с разминки 10 минут и контролируйте пульс.",
+      "Возраст 70+: тренируйтесь только после консультации с врачом. Контролируйте давление и пульс, делайте паузы при головокружении.",
+    );
+  } else if (f.age >= 60) {
+    warnings.push(
+      "Возраст 60+: разминка 10–15 минут обязательна. Избегайте задержки дыхания (приём Вальсальвы) при работе с весами.",
+    );
+  } else if (f.age >= 50) {
+    warnings.push(
+      "Возраст 50+: уделяйте внимание суставной разминке и мобильности. Прибавляйте веса медленно (~5% в месяц).",
     );
   }
-  if (excludeJumps) {
-    warnings.push(
-      "Прыжковые упражнения исключены: возраст > 45 и вес > 100 кг (нагрузка на суставы).",
-    );
-  }
-  if (f.weight > 110) {
-    warnings.push(
-      "При большом весе избегайте резких движений и используйте мягкое покрытие.",
-    );
-  }
+
   if (f.age < 16) {
     warnings.push(
-      "Подросткам не рекомендуется работа с большими весами — делайте акцент на технику.",
+      "До 16 лет: работа с предельными весами не рекомендуется. Фокус на технике, бодивейте и подвижности.",
+    );
+  } else if (f.age < 18) {
+    warnings.push(
+      "До 18 лет: избегайте максимальных весов (90%+ от 1ПМ). Работайте в диапазоне 8–12 повторений с запасом.",
     );
   }
+
+  if (excludeJumps) {
+    const reason =
+      f.age >= 50 && f.weight >= 100
+        ? "возраст 50+ и вес 100+ кг"
+        : f.age >= 50
+          ? "возраст 50+"
+          : "вес 100+ кг";
+    warnings.push(
+      `Прыжковые и ударные упражнения исключены (${reason}) — берегите суставы.`,
+    );
+  }
+
+  if (f.weight >= 120) {
+    warnings.push(
+      "Большой вес: используйте мягкое покрытие, выбирайте упражнения сидя/лёжа/у опоры. Избегайте бега и прыжков.",
+    );
+  } else if (f.weight >= 100) {
+    warnings.push(
+      "Вес 100+ кг: следите за техникой приседов и выпадов, не «заваливайте» колени внутрь.",
+    );
+  }
+
+  if (f.age >= 50 && f.goal === "strength") {
+    warnings.push(
+      "После 50 веса снижены автоматически (~–15–25%) — это норма. Восстановление между тренировками 48–72 часа.",
+    );
+  }
+
   if (f.place === "home" && !f.homeDumbbells && !f.homeBands && f.goal === "strength") {
     warnings.push(
       "Силовая тренировка дома без инвентаря ограничена. Подключите гантели или резинки для большего эффекта.",
@@ -539,9 +647,16 @@ export function generateWorkout(f: FormData): WorkoutResult {
 
   // Советы
   const tips: string[] = [];
-  tips.push("Перед тренировкой — разминка 5–10 минут (суставная гимнастика).");
+  const warmup =
+    f.age >= 60 ? "10–15 минут" : f.age >= 45 ? "8–10 минут" : "5–10 минут";
+  tips.push(`Перед тренировкой — разминка ${warmup} (суставная гимнастика).`);
+
   if (f.goal === "strength") {
-    tips.push("Между тренировками одной группы мышц — 48 часов отдыха.");
+    tips.push(
+      f.age >= 50
+        ? "Между тренировками одной группы мышц — 72 часа отдыха."
+        : "Между тренировками одной группы мышц — 48 часов отдыха.",
+    );
     tips.push("Спите не менее 7–8 часов: рост мышц происходит во сне.");
   }
   if (f.goal === "endurance") {
@@ -552,22 +667,33 @@ export function generateWorkout(f: FormData): WorkoutResult {
     tips.push("Добавьте 7–10 тыс. шагов в день для усиления эффекта.");
     tips.push("Контролируйте питание — без дефицита калорий жир не уйдёт.");
   }
+  if (f.age >= 50) {
+    tips.push("Добавьте 1–2 раза в неделю упражнения на баланс и мобильность.");
+  }
   if (f.level === "advanced") {
     tips.push("Раз в 6–8 недель устраивайте разгрузочную неделю.");
   } else {
-    tips.push("Не тренируйтесь чаще 3–4 раз в неделю на старте.");
+    tips.push(
+      f.age >= 60
+        ? "Не тренируйтесь чаще 2–3 раз в неделю, давайте телу восстановиться."
+        : "Не тренируйтесь чаще 3–4 раз в неделю на старте.",
+    );
   }
   tips.push("После тренировки — заминка и растяжка 5 минут.");
 
-  // Отдых между упражнениями
+  // Отдых между упражнениями (с учётом возраста)
   const restBetweenByLevel: Record<Level, string> = {
     beginner: "1.5–2 минуты",
     intermediate: "60–90 секунд",
     advanced: "45–60 секунд",
   };
   let restBetween = restBetweenByLevel[f.level];
-  if (f.goal === "strength") restBetween += " (можно до 2–3 мин на тяжёлых базовых)";
-  if (f.goal === "fatburn") restBetween = "30–60 секунд (держим пульс)";
+  if (f.age >= 60) restBetween = "2–3 минуты (полное восстановление пульса)";
+  else if (f.age >= 50) restBetween = "1.5–2.5 минуты";
+  if (f.goal === "strength" && f.age < 50)
+    restBetween += " (можно до 2–3 мин на тяжёлых базовых)";
+  if (f.goal === "fatburn" && f.age < 55)
+    restBetween = "30–60 секунд (держим пульс)";
 
   return { exercises, calories, warnings, tips, summary, restBetween };
 }
