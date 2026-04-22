@@ -235,7 +235,7 @@ function Pill({
       type="button"
       onClick={onClick}
       className={
-        "min-w-0 w-full rounded-lg border px-2 py-2 text-xs sm:text-sm font-medium leading-tight whitespace-normal break-words text-center transition " +
+        "min-w-0 w-full rounded-lg border px-1.5 py-2 text-[11px] sm:text-sm font-medium leading-tight whitespace-nowrap overflow-hidden text-ellipsis text-center transition " +
         (active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-input bg-background hover:bg-secondary")
