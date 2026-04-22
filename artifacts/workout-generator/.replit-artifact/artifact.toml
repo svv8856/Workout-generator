@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Генератор тренировок"
+version = "1.0.0"
+id = "artifacts/workout-generator"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24834
+
+[services.development]
+run = "pnpm --filter @workspace/workout-generator run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/workout-generator", "run", "build" ]
+publicDir = "artifacts/workout-generator/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24834"
+BASE_PATH = "/"
