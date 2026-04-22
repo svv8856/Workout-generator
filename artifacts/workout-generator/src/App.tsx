@@ -279,6 +279,12 @@ function ResultView({
         </div>
       )}
 
+      {result.summary && (
+        <p className="text-xs text-muted-foreground">
+          Задействуем: {result.summary}
+        </p>
+      )}
+
       <ol className="space-y-2">
         {result.exercises.map((ex, i) => (
           <li
@@ -288,8 +294,13 @@ function ResultView({
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               {i + 1}
             </span>
-            <div>
-              <p className="font-medium">{ex.name}</p>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <p className="font-medium">{ex.name}</p>
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                  {ex.muscle}
+                </span>
+              </div>
               <p className="text-sm text-muted-foreground">{ex.sets}</p>
             </div>
           </li>

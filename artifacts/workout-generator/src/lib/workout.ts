@@ -2,6 +2,24 @@ export type Gender = "male" | "female";
 export type Level = "beginner" | "intermediate" | "advanced";
 export type Goal = "strength" | "endurance" | "fatburn";
 export type Place = "home" | "gym" | "outdoor";
+export type Muscle =
+  | "legs"
+  | "chest"
+  | "back"
+  | "shoulders"
+  | "arms"
+  | "core"
+  | "cardio"
+  | "glutes"
+  | "fullbody";
+export type Equipment =
+  | "none"
+  | "dumbbells"
+  | "bands"
+  | "barbell"
+  | "machines"
+  | "kettlebell"
+  | "bar"; // турник/брусья
 
 export interface FormData {
   age: number;
@@ -17,189 +35,316 @@ export interface FormData {
 
 export interface Exercise {
   name: string;
-  sets: string;
+  muscle: Muscle;
+  equipment: Equipment;
   jumping?: boolean;
-  needsBar?: boolean;
-  needsWeights?: boolean;
-  outdoor?: boolean;
-  needsDumbbells?: boolean;
-  needsBands?: boolean;
+  cardio?: boolean;
+  highImpact?: boolean;
+  goals: Goal[];
+  minLevel?: Level;
+}
+
+export interface ExerciseOut {
+  name: string;
+  sets: string;
+  muscle: string;
 }
 
 const setsByLevel: Record<Level, string> = {
-  beginner: "3 подхода × 8–10 повторений, отдых 60 сек",
-  intermediate: "4 подхода × 10–12 повторений, отдых 45 сек",
-  advanced: "5 подходов × 12–15 повторений, отдых 30 сек",
+  beginner: "3 × 8–10, отдых 60 сек",
+  intermediate: "4 × 10–12, отдых 45 сек",
+  advanced: "5 × 12–15, отдых 30 сек",
 };
 
 const cardioByLevel: Record<Level, string> = {
-  beginner: "3 подхода × 30 сек, отдых 60 сек",
-  intermediate: "4 подхода × 45 сек, отдых 45 сек",
-  advanced: "5 подходов × 60 сек, отдых 30 сек",
+  beginner: "3 × 30 сек, отдых 60 сек",
+  intermediate: "4 × 45 сек, отдых 45 сек",
+  advanced: "5 × 60 сек, отдых 30 сек",
 };
 
-function pool(goal: Goal, place: Place): Exercise[] {
-  const list: Exercise[] = [];
+const isometricByLevel: Record<Level, string> = {
+  beginner: "3 × 30 сек",
+  intermediate: "4 × 45 сек",
+  advanced: "5 × 60 сек",
+};
 
+const muscleLabel: Record<Muscle, string> = {
+  legs: "Ноги",
+  chest: "Грудь",
+  back: "Спина",
+  shoulders: "Плечи",
+  arms: "Руки",
+  core: "Кор / пресс",
+  cardio: "Кардио",
+  glutes: "Ягодицы",
+  fullbody: "Всё тело",
+};
+
+const levelOrder: Record<Level, number> = {
+  beginner: 0,
+  intermediate: 1,
+  advanced: 2,
+};
+
+const ALL: Goal[] = ["strength", "endurance", "fatburn"];
+
+// База упражнений — широкий пул для всех мест и инвентаря
+const EXERCISES: Exercise[] = [
+  // === Без инвентаря (дом / улица / зал — везде) ===
+  { name: "Приседания с собственным весом", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Глубокие приседания «сумо»", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Болгарские сплит-приседания", muscle: "legs", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Выпады на месте", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Выпады в ходьбе", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Боковые выпады", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Подъёмы на носки", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Пистолетик (присед на одной ноге)", muscle: "legs", equipment: "none", goals: ["strength"], minLevel: "advanced" },
+
+  { name: "Ягодичный мост", muscle: "glutes", equipment: "none", goals: ALL },
+  { name: "Ягодичный мост на одной ноге", muscle: "glutes", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "«Пожарный гидрант»", muscle: "glutes", equipment: "none", goals: ALL },
+  { name: "Махи ногой назад в упоре", muscle: "glutes", equipment: "none", goals: ALL },
+
+  { name: "Отжимания от пола", muscle: "chest", equipment: "none", goals: ALL },
+  { name: "Отжимания с узкой постановкой", muscle: "chest", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Отжимания с широкой постановкой", muscle: "chest", equipment: "none", goals: ALL },
+  { name: "Отжимания с колен", muscle: "chest", equipment: "none", goals: ["endurance", "fatburn"] },
+  { name: "Алмазные отжимания", muscle: "arms", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Обратные отжимания от стула", muscle: "arms", equipment: "none", goals: ALL },
+  { name: "Отжимания «щука»", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+
+  { name: "Супермен", muscle: "back", equipment: "none", goals: ALL },
+  { name: "Лодочка", muscle: "back", equipment: "none", goals: ALL },
+  { name: "Обратная гиперэкстензия", muscle: "back", equipment: "none", goals: ALL },
+
+  { name: "Планка", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Боковая планка", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Скручивания", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Обратные скручивания", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Велосипед лёжа", muscle: "core", equipment: "none", goals: ALL },
+  { name: "«Мёртвый жук»", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Складка V-up", muscle: "core", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Русские скручивания", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Подъёмы ног лёжа", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Планка с касанием плеч", muscle: "core", equipment: "none", goals: ALL },
+
+  // Кардио / прыжковые
+  { name: "Прыжки «джампинг джек»", muscle: "cardio", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
+  { name: "Берпи", muscle: "fullbody", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
+  { name: "Скалолаз (альпинист)", muscle: "core", equipment: "none", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Высокие колени", muscle: "cardio", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
+  { name: "Захлёсты голени", muscle: "cardio", equipment: "none", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Бег на месте", muscle: "cardio", equipment: "none", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Прыжки в приседе", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["fatburn", "strength"], minLevel: "intermediate" },
+  { name: "Запрыгивания на возвышение", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Прыжки через скакалку", muscle: "cardio", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
+  { name: "Конькобежец (skater)", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["fatburn", "endurance"] },
+
+  // === Гантели ===
+  { name: "Приседания с гантелями (гоблет)", muscle: "legs", equipment: "dumbbells", goals: ALL },
+  { name: "Выпады с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL },
+  { name: "Румынская тяга с гантелями", muscle: "glutes", equipment: "dumbbells", goals: ALL },
+  { name: "Зашагивания с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL },
+  { name: "Жим гантелей лёжа (на полу)", muscle: "chest", equipment: "dumbbells", goals: ALL },
+  { name: "Разводка гантелей лёжа", muscle: "chest", equipment: "dumbbells", goals: ALL },
+  { name: "Тяга гантели в наклоне", muscle: "back", equipment: "dumbbells", goals: ALL },
+  { name: "Тяга гантелей в наклоне двумя руками", muscle: "back", equipment: "dumbbells", goals: ALL },
+  { name: "Жим гантелей сидя/стоя", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
+  { name: "Махи гантелями в стороны", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
+  { name: "Махи гантелями в наклоне", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
+  { name: "Подъём гантелей на бицепс", muscle: "arms", equipment: "dumbbells", goals: ALL },
+  { name: "Французский жим с гантелью", muscle: "arms", equipment: "dumbbells", goals: ALL },
+  { name: "«Молотки» с гантелями", muscle: "arms", equipment: "dumbbells", goals: ALL },
+  { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"] },
+  { name: "Турецкий подъём", muscle: "fullbody", equipment: "dumbbells", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Свинг гантелью", muscle: "glutes", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance"] },
+
+  // === Резинки ===
+  { name: "Тяга резинки к поясу сидя", muscle: "back", equipment: "bands", goals: ALL },
+  { name: "Жим резинки от груди", muscle: "chest", equipment: "bands", goals: ALL },
+  { name: "Разводка резинкой стоя", muscle: "chest", equipment: "bands", goals: ALL },
+  { name: "Жим резинки над головой", muscle: "shoulders", equipment: "bands", goals: ALL },
+  { name: "Отведение рук с резинкой", muscle: "shoulders", equipment: "bands", goals: ALL },
+  { name: "Бицепс с резинкой", muscle: "arms", equipment: "bands", goals: ALL },
+  { name: "Трицепс с резинкой из-за головы", muscle: "arms", equipment: "bands", goals: ALL },
+  { name: "Приседания с резинкой над коленями", muscle: "legs", equipment: "bands", goals: ALL },
+  { name: "Боковые шаги с резинкой («краб»)", muscle: "glutes", equipment: "bands", goals: ALL },
+  { name: "Отведение бедра с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
+  { name: "Ягодичный мост с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
+  { name: "Тяга резинки к лицу", muscle: "shoulders", equipment: "bands", goals: ALL },
+  { name: "«Раскрытие» плеч с резинкой", muscle: "back", equipment: "bands", goals: ALL },
+  { name: "Подъёмы прямой ноги с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
+
+  // === Зал: штанга / тренажёры ===
+  { name: "Приседания со штангой", muscle: "legs", equipment: "barbell", goals: ALL },
+  { name: "Фронтальные приседания", muscle: "legs", equipment: "barbell", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Жим штанги лёжа", muscle: "chest", equipment: "barbell", goals: ALL },
+  { name: "Жим штанги под углом", muscle: "chest", equipment: "barbell", goals: ALL },
+  { name: "Становая тяга", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Румынская тяга со штангой", muscle: "glutes", equipment: "barbell", goals: ALL },
+  { name: "Тяга штанги в наклоне", muscle: "back", equipment: "barbell", goals: ALL },
+  { name: "Армейский жим", muscle: "shoulders", equipment: "barbell", goals: ALL },
+  { name: "Подъём штанги на бицепс", muscle: "arms", equipment: "barbell", goals: ALL },
+  { name: "Жим узким хватом", muscle: "arms", equipment: "barbell", goals: ALL },
+
+  { name: "Жим ногами в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
+  { name: "Разгибания ног в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
+  { name: "Сгибания ног в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
+  { name: "Тяга верхнего блока", muscle: "back", equipment: "machines", goals: ALL },
+  { name: "Горизонтальная тяга в блоке", muscle: "back", equipment: "machines", goals: ALL },
+  { name: "Сведение в кроссовере", muscle: "chest", equipment: "machines", goals: ALL },
+  { name: "Трицепс на блоке", muscle: "arms", equipment: "machines", goals: ALL },
+  { name: "Беговая дорожка (интервалы)", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Гребной тренажёр", muscle: "fullbody", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Эллипсоид", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Велотренажёр", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
+
+  { name: "Махи гирей", muscle: "glutes", equipment: "kettlebell", cardio: true, goals: ["fatburn", "endurance", "strength"] },
+  { name: "Гоблет-присед с гирей", muscle: "legs", equipment: "kettlebell", goals: ALL },
+
+  // === Улица / турник ===
+  { name: "Подтягивания прямым хватом", muscle: "back", equipment: "bar", goals: ["strength", "endurance"], minLevel: "intermediate" },
+  { name: "Подтягивания обратным хватом", muscle: "arms", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Австралийские подтягивания", muscle: "back", equipment: "bar", goals: ALL },
+  { name: "Отжимания на брусьях", muscle: "chest", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Подъём коленей в висе", muscle: "core", equipment: "bar", goals: ALL },
+  { name: "Подъём ног в висе", muscle: "core", equipment: "bar", goals: ["strength"], minLevel: "advanced" },
+  { name: "Уголок в упоре на брусьях", muscle: "core", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
+];
+
+function isAllowed(
+  ex: Exercise,
+  f: FormData,
+  excludeJumps: boolean,
+): boolean {
+  if (!ex.goals.includes(f.goal)) return false;
+  if (ex.minLevel && levelOrder[f.level] < levelOrder[ex.minLevel]) return false;
+  if (excludeJumps && ex.highImpact) return false;
+
+  switch (f.place) {
+    case "home": {
+      if (ex.equipment === "none") return true;
+      if (ex.equipment === "dumbbells") return !!f.homeDumbbells;
+      if (ex.equipment === "bands") return !!f.homeBands;
+      return false; // нет штанги/тренажёров/турника дома
+    }
+    case "gym": {
+      // в зале есть всё, кроме улицы (брусья/турник опционально, но допустим)
+      return ["none", "dumbbells", "bands", "barbell", "machines", "kettlebell", "bar"].includes(
+        ex.equipment,
+      );
+    }
+    case "outdoor": {
+      // на улице нет штанги/тренажёров; гантели/резинки маловероятны
+      return ex.equipment === "none" || ex.equipment === "bar";
+    }
+  }
+}
+
+function setsFor(ex: Exercise, level: Level): string {
+  if (ex.cardio) return cardioByLevel[level];
+  if (ex.muscle === "core" && (ex.name === "Планка" || ex.name === "Боковая планка")) {
+    return isometricByLevel[level];
+  }
+  return setsByLevel[level];
+}
+
+// Перемешивание массива (Fisher–Yates)
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
+}
+
+// Сбалансированный отбор: стараемся охватить разные группы мышц
+function pickBalanced(pool: Exercise[], goal: Goal, target: number): Exercise[] {
+  // Желаемое распределение по типам в зависимости от цели
+  const priorityByGoal: Record<Goal, Muscle[]> = {
+    strength: ["legs", "chest", "back", "shoulders", "arms", "core", "glutes"],
+    endurance: ["cardio", "core", "legs", "fullbody", "back", "shoulders", "chest"],
+    fatburn: ["cardio", "fullbody", "legs", "glutes", "core", "back", "chest"],
+  };
+
+  const priority = priorityByGoal[goal];
+  const shuffled = shuffle(pool);
+  const picked: Exercise[] = [];
+  const usedMuscles = new Set<Muscle>();
+  const usedNames = new Set<string>();
+
+  // 1) Берём по одному из каждой приоритетной группы мышц
+  for (const muscle of priority) {
+    if (picked.length >= target) break;
+    const found = shuffled.find(
+      (e) => e.muscle === muscle && !usedNames.has(e.name),
+    );
+    if (found) {
+      picked.push(found);
+      usedNames.add(found.name);
+      usedMuscles.add(found.muscle);
+    }
+  }
+
+  // 2) Добиваем до target случайными оставшимися
+  for (const ex of shuffled) {
+    if (picked.length >= target) break;
+    if (!usedNames.has(ex.name)) {
+      picked.push(ex);
+      usedNames.add(ex.name);
+    }
+  }
+
+  // 3) Для жиросжигания — гарантируем минимум 1 кардио-движение, если оно есть в пуле
+  const hasCardio = picked.some((e) => e.cardio);
+  if (!hasCardio && (goal === "fatburn" || goal === "endurance")) {
+    const cardio = shuffled.find((e) => e.cardio && !usedNames.has(e.name));
+    if (cardio && picked.length > 0) {
+      picked[picked.length - 1] = cardio;
+    }
+  }
+
+  // 4) Перемешиваем порядок выполнения, но кардио — ближе к концу для силовых
   if (goal === "strength") {
-    if (place === "home") {
-      list.push(
-        { name: "Приседания", sets: setsByLevel.beginner },
-        { name: "Отжимания от пола", sets: setsByLevel.beginner },
-        { name: "Выпады на месте", sets: setsByLevel.beginner },
-        { name: "Обратные отжимания от стула", sets: setsByLevel.beginner },
-        { name: "Ягодичный мост", sets: setsByLevel.beginner },
-        { name: "Планка", sets: "3 подхода × 30–60 сек" },
-      );
-    } else if (place === "gym") {
-      list.push(
-        { name: "Приседания со штангой", sets: setsByLevel.beginner, needsBar: true },
-        { name: "Жим штанги лёжа", sets: setsByLevel.beginner, needsBar: true },
-        { name: "Тяга гантели в наклоне", sets: setsByLevel.beginner, needsWeights: true },
-        { name: "Выпады с гантелями", sets: setsByLevel.beginner, needsWeights: true },
-        { name: "Жим гантелей сидя", sets: setsByLevel.beginner, needsWeights: true },
-        { name: "Становая тяга", sets: setsByLevel.beginner, needsBar: true },
-      );
-    } else {
-      list.push(
-        { name: "Подтягивания", sets: setsByLevel.beginner, outdoor: true },
-        { name: "Отжимания на брусьях", sets: setsByLevel.beginner, outdoor: true },
-        { name: "Приседания", sets: setsByLevel.beginner },
-        { name: "Выпады в ходьбе", sets: setsByLevel.beginner },
-        { name: "Отжимания от земли", sets: setsByLevel.beginner },
-        { name: "Подъёмы коленей в висе", sets: setsByLevel.beginner, outdoor: true },
-      );
-    }
+    picked.sort((a, b) => Number(!!a.cardio) - Number(!!b.cardio));
+  } else {
+    // Для кардио/жиросжигания чередуем
+    return shuffle(picked);
   }
-
-  if (goal === "endurance") {
-    list.push(
-      { name: "Планка", sets: "3 подхода × 30–60 сек" },
-      { name: "Бег на месте", sets: cardioByLevel.beginner, jumping: true },
-      { name: "Скручивания", sets: setsByLevel.beginner },
-      { name: "Боковая планка", sets: "по 30 сек на сторону, 3 подхода" },
-    );
-    if (place === "outdoor") {
-      list.push(
-        { name: "Лёгкий бег", sets: "15–25 минут в умеренном темпе", outdoor: true },
-        { name: "Подтягивания", sets: setsByLevel.beginner, outdoor: true },
-      );
-    } else if (place === "gym") {
-      list.push(
-        { name: "Беговая дорожка", sets: "20 минут, пульс 60–70%" },
-        { name: "Гребной тренажёр", sets: "10 минут" },
-      );
-    } else {
-      list.push(
-        { name: "Велосипед лёжа (упражнение)", sets: setsByLevel.beginner },
-        { name: "Прыжки со скакалкой", sets: cardioByLevel.beginner, jumping: true },
-      );
-    }
-  }
-
-  if (goal === "fatburn") {
-    list.push(
-      { name: "Прыжки на месте", sets: cardioByLevel.beginner, jumping: true },
-      { name: "Берпи", sets: cardioByLevel.beginner, jumping: true },
-      { name: "Скалолаз (альпинист)", sets: cardioByLevel.beginner },
-      { name: "Высокие колени", sets: cardioByLevel.beginner, jumping: true },
-    );
-    if (place === "outdoor") {
-      list.push(
-        { name: "Интервальный бег", sets: "5 × 1 мин быстро / 1 мин медленно", outdoor: true },
-        { name: "Подтягивания", sets: setsByLevel.beginner, outdoor: true },
-      );
-    } else if (place === "gym") {
-      list.push(
-        { name: "Приседания с гантелями", sets: setsByLevel.beginner, needsWeights: true },
-        { name: "Махи гирей", sets: setsByLevel.beginner, needsWeights: true },
-      );
-    } else {
-      list.push(
-        { name: "Приседания", sets: setsByLevel.beginner },
-        { name: "Отжимания", sets: setsByLevel.beginner },
-      );
-    }
-  }
-
-  return list;
+  return picked;
 }
 
 export interface WorkoutResult {
-  exercises: Exercise[];
+  exercises: ExerciseOut[];
   calories: number;
   warnings: string[];
   tips: string[];
+  summary: string;
 }
 
 export function generateWorkout(f: FormData): WorkoutResult {
-  let list = pool(f.goal, f.place);
-
-  // Дополнительный инвентарь для дома
-  if (f.place === "home") {
-    if (f.homeDumbbells) {
-      list.push(
-        { name: "Жим гантелей стоя", sets: setsByLevel.beginner, needsDumbbells: true },
-        { name: "Тяга гантели в наклоне", sets: setsByLevel.beginner, needsDumbbells: true },
-        { name: "Приседания с гантелями", sets: setsByLevel.beginner, needsDumbbells: true },
-        { name: "Подъём гантелей на бицепс", sets: setsByLevel.beginner, needsDumbbells: true },
-      );
-    }
-    if (f.homeBands) {
-      list.push(
-        { name: "Тяга резинки к поясу", sets: setsByLevel.beginner, needsBands: true },
-        { name: "Отведение бедра с резинкой", sets: setsByLevel.beginner, needsBands: true },
-        { name: "Жим резинки от груди", sets: setsByLevel.beginner, needsBands: true },
-        { name: "Боковые шаги с резинкой", sets: setsByLevel.beginner, needsBands: true },
-      );
-    }
-  }
-
-  // Возрастно-весовое исключение прыжков
   const excludeJumps = f.age > 45 && f.weight > 100;
-  if (excludeJumps) {
-    list = list.filter((e) => !e.jumping);
-  }
+  const pool = EXERCISES.filter((e) => isAllowed(e, f, excludeJumps));
 
-  // Исключение по месту
-  if (f.place === "home") {
-    list = list.filter((e) => {
-      if (e.outdoor) return false;
-      if (e.needsBar) return false;
-      if (e.needsWeights) return false;
-      if (e.needsDumbbells && !f.homeDumbbells) return false;
-      if (e.needsBands && !f.homeBands) return false;
-      return true;
-    });
-  } else if (f.place === "gym") {
-    list = list.filter((e) => !e.outdoor);
-  }
+  // Целевое количество — 5–6 упражнений
+  const target = Math.random() < 0.5 ? 5 : 6;
+  const picked = pickBalanced(pool, f.goal, Math.min(target, pool.length));
 
-  // Подстройка под уровень
-  const setsTemplate = setsByLevel[f.level];
-  const cardioTemplate = cardioByLevel[f.level];
-  list = list.map((e) => {
-    if (e.sets === setsByLevel.beginner) return { ...e, sets: setsTemplate };
-    if (e.sets === cardioByLevel.beginner) return { ...e, sets: cardioTemplate };
-    return e;
-  });
+  const exercises: ExerciseOut[] = picked.map((ex) => ({
+    name: ex.name,
+    sets: setsFor(ex, f.level),
+    muscle: muscleLabel[ex.muscle],
+  }));
 
-  // Уникализируем по названию и берём 5–6
-  const seen = new Set<string>();
-  const unique: Exercise[] = [];
-  for (const ex of list) {
-    if (!seen.has(ex.name)) {
-      seen.add(ex.name);
-      unique.push(ex);
-    }
-  }
-  const target = unique.length >= 6 ? 6 : Math.max(5, Math.min(unique.length, 6));
-  const exercises = unique.slice(0, target);
-
-  // Калории: вес × 0.075 × минуты, поправки на уровень и цель
+  // Калории: вес × 0.075 × минуты × поправка
   const levelMul = { beginner: 0.9, intermediate: 1, advanced: 1.15 }[f.level];
   const goalMul = { strength: 1, endurance: 1.1, fatburn: 1.25 }[f.goal];
   const calories = Math.round(f.weight * 0.075 * f.duration * levelMul * goalMul);
+
+  // Сводка по задействованным группам
+  const muscles = Array.from(new Set(picked.map((e) => muscleLabel[e.muscle])));
+  const summary = muscles.join(" · ");
 
   // Предупреждения
   const warnings: string[] = [];
@@ -208,9 +353,9 @@ export function generateWorkout(f: FormData): WorkoutResult {
       "Возраст более 60 лет — начните с разминки 10 минут и контролируйте пульс.",
     );
   }
-  if (f.age > 45 && f.weight > 100) {
+  if (excludeJumps) {
     warnings.push(
-      "Из тренировки убраны прыжковые упражнения — они дают повышенную нагрузку на суставы.",
+      "Прыжковые упражнения исключены: возраст > 45 и вес > 100 кг (нагрузка на суставы).",
     );
   }
   if (f.weight > 110) {
@@ -223,8 +368,13 @@ export function generateWorkout(f: FormData): WorkoutResult {
       "Подросткам не рекомендуется работа с большими весами — делайте акцент на технику.",
     );
   }
+  if (f.place === "home" && !f.homeDumbbells && !f.homeBands && f.goal === "strength") {
+    warnings.push(
+      "Силовая тренировка дома без инвентаря ограничена. Подключите гантели или резинки для большего эффекта.",
+    );
+  }
 
-  // Советы по отдыху
+  // Советы
   const tips: string[] = [];
   tips.push("Перед тренировкой — разминка 5–10 минут (суставная гимнастика).");
   if (f.goal === "strength") {
@@ -246,5 +396,5 @@ export function generateWorkout(f: FormData): WorkoutResult {
   }
   tips.push("После тренировки — заминка и растяжка 5 минут.");
 
-  return { exercises, calories, warnings, tips };
+  return { exercises, calories, warnings, tips, summary };
 }
