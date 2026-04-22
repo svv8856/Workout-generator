@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   generateWorkout,
   generateCourse,
+  clearWorkoutHistory,
+  getHistorySummary,
   type FormData,
   type Course,
   type CourseDays,
@@ -46,6 +48,8 @@ function App() {
     null,
   );
   const [course, setCourse] = useState<Course | null>(null);
+  const [historyTick, setHistoryTick] = useState(0);
+  const history = getHistorySummary();
 
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -236,6 +240,28 @@ function App() {
               </>
             )}
 
+            {mode === "single" && history.lastFocus && (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex items-center justify-between gap-2">
+                <span>
+                  <span className="text-muted-foreground">Прошлая тренировка:</span>{" "}
+                  <span className="font-medium text-foreground">
+                    {history.lastFocus}
+                  </span>{" "}
+                  <span className="text-muted-foreground">· {history.lastWhen}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearWorkoutHistory();
+                    setHistoryTick((t) => t + 1);
+                  }}
+                  className="text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  сбросить
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[.99]"
@@ -343,6 +369,17 @@ function ResultView({
               <li key={i}>{w}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {result.focusLabel && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span className="font-semibold">Фокус сегодня:</span> {result.focusLabel}
+          {result.focusNote && (
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              {result.focusNote}
+            </span>
+          )}
         </div>
       )}
 

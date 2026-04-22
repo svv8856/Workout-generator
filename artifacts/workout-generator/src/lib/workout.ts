@@ -537,6 +537,88 @@ export interface WorkoutResult {
   tips: string[];
   summary: string;
   restBetween: string;
+  focusLabel?: string;
+  focusNote?: string;
+}
+
+// =====================================================================
+//                    ИСТОРИЯ ТРЕНИРОВОК (для не-повторения)
+// =====================================================================
+
+const HISTORY_KEY = "wg_history_v1";
+const REGEN_WINDOW_MS = 30 * 60 * 1000; // 30 минут — окно «регенерации», не считаем
+
+interface HistoryEntry {
+  ts: number;
+  muscles: Muscle[];
+  focus?: string;
+}
+
+function loadHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as HistoryEntry[];
+    const cutoff = Date.now() - 14 * 24 * 3600 * 1000;
+    return arr.filter((e) => e.ts > cutoff).slice(-20);
+  } catch {
+    return [];
+  }
+}
+
+function saveHistoryEntry(muscles: Muscle[], focus?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const arr = loadHistory();
+    arr.push({ ts: Date.now(), muscles, focus });
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-20)));
+  } catch {}
+}
+
+export function clearWorkoutHistory() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(HISTORY_KEY);
+  } catch {}
+}
+
+export function getHistorySummary(): { lastFocus?: string; lastWhen?: string } {
+  const arr = loadHistory();
+  // Берём последнюю запись СТАРШЕ окна регенерации
+  const cutoff = Date.now() - REGEN_WINDOW_MS;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].ts <= cutoff) {
+      const ageH = (Date.now() - arr[i].ts) / 3600 / 1000;
+      const lastWhen =
+        ageH < 24
+          ? `${Math.round(ageH)} ч назад`
+          : `${Math.floor(ageH / 24)} дн назад`;
+      return { lastFocus: arr[i].focus, lastWhen };
+    }
+  }
+  return {};
+}
+
+// Группы PPL для определения «свежей» сессии
+const FOCUS_TEMPLATES: Array<{
+  label: string;
+  primary: Muscle[];
+  filler: Muscle[];
+}> = [
+  { label: "Push (грудь, плечи, трицепс)", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+  { label: "Pull (спина, бицепс)", primary: ["back", "arms"], filler: ["core"] },
+  { label: "Legs (ноги, ягодицы)", primary: ["legs", "glutes"], filler: ["core"] },
+];
+
+function recentMuscleSet(): Set<Muscle> {
+  const cutoff = Date.now() - REGEN_WINDOW_MS;
+  const entries = loadHistory().filter((e) => e.ts <= cutoff);
+  // Берём последние 2 «реальные» сессии (за вычетом регенераций)
+  const recent = entries.slice(-2);
+  const set = new Set<Muscle>();
+  recent.forEach((e) => e.muscles.forEach((m) => set.add(m)));
+  return set;
 }
 
 export function generateWorkout(f: FormData): WorkoutResult {
@@ -559,7 +641,43 @@ export function generateWorkout(f: FormData): WorkoutResult {
   const target = seniorMode
     ? Math.random() < 0.5 ? 4 : 5
     : Math.random() < 0.5 ? 5 : 6;
-  const picked = pickBalanced(pool, f.goal, Math.min(target, pool.length));
+
+  // ---- ВЫБОР ФОКУСА С УЧЁТОМ ИСТОРИИ ----
+  const recent = recentMuscleSet();
+  let focusLabel: string | undefined;
+  let focusNote: string | undefined;
+  let picked: Exercise[];
+
+  if (recent.size > 0) {
+    // Скоринг: меньше пересечений с недавно тренированными мышцами = лучше
+    const scored = FOCUS_TEMPLATES.map((t) => ({
+      t,
+      overlap: t.primary.filter((m) => recent.has(m)).length,
+      poolMatch: pool.filter((e) => t.primary.includes(e.muscle)).length,
+    }))
+      .filter((s) => s.poolMatch >= 2) // достаточно упражнений в пуле
+      .sort((a, b) => a.overlap - b.overlap || b.poolMatch - a.poolMatch);
+
+    if (scored.length > 0 && scored[0].overlap < scored[0].t.primary.length) {
+      const fresh = scored[0].t;
+      picked = pickForSession(
+        pool,
+        fresh.primary,
+        Math.min(target, pool.length),
+        fresh.filler,
+      );
+      focusLabel = fresh.label;
+      focusNote = "Подобрали группы мышц, которые вы давно не тренировали.";
+    } else {
+      // Все группы недавно делали — full body
+      picked = pickBalanced(pool, f.goal, Math.min(target, pool.length));
+      focusLabel = "Всё тело";
+      focusNote = "Все основные группы тренировались на этой неделе — даём общую сессию.";
+    }
+  } else {
+    // Истории нет — обычная балансировка по цели
+    picked = pickBalanced(pool, f.goal, Math.min(target, pool.length));
+  }
 
   const exercises: ExerciseOut[] = picked.map((ex) => ({
     name: ex.name,
@@ -696,7 +814,20 @@ export function generateWorkout(f: FormData): WorkoutResult {
   if (f.goal === "fatburn" && f.age < 55)
     restBetween = "30–60 секунд (держим пульс)";
 
-  return { exercises, calories, warnings, tips, summary, restBetween };
+  // Сохраняем сессию в историю (для следующего раза)
+  const sessionMuscles = Array.from(new Set(picked.map((e) => e.muscle)));
+  saveHistoryEntry(sessionMuscles, focusLabel);
+
+  return {
+    exercises,
+    calories,
+    warnings,
+    tips,
+    summary,
+    restBetween,
+    focusLabel,
+    focusNote,
+  };
 }
 
 // =====================================================================
@@ -732,42 +863,43 @@ export interface Course {
 
 interface SplitSession {
   type: string;
-  priority: Muscle[];
+  primary: Muscle[];
+  filler: Muscle[];
 }
 
 const SPLITS: Record<CourseDays, { name: string; sessions: SplitSession[] }> = {
   2: {
-    name: "Full Body × 2",
+    name: "Верх / Низ",
     sessions: [
-      { type: "Всё тело · акцент низ", priority: ["legs", "glutes", "back", "core", "chest"] },
-      { type: "Всё тело · акцент верх", priority: ["chest", "back", "shoulders", "arms", "core"] },
+      { type: "Верх (грудь, спина, плечи, руки)", primary: ["chest", "back", "shoulders", "arms"], filler: ["core"] },
+      { type: "Низ (ноги, ягодицы)", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
   3: {
-    name: "Full Body × 3",
+    name: "Push / Pull / Legs",
     sessions: [
-      { type: "Всё тело А", priority: ["legs", "chest", "back", "core"] },
-      { type: "Всё тело Б", priority: ["glutes", "shoulders", "arms", "core"] },
-      { type: "Всё тело В", priority: ["legs", "back", "chest", "shoulders", "core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Legs — ноги, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
   4: {
-    name: "Верх / Низ",
+    name: "Верх / Низ × 2",
     sessions: [
-      { type: "Верх 1 (грудь, спина)", priority: ["chest", "back", "core", "arms"] },
-      { type: "Низ 1 (квадрицепс)", priority: ["legs", "core", "glutes"] },
-      { type: "Верх 2 (плечи, руки)", priority: ["shoulders", "arms", "back", "core"] },
-      { type: "Низ 2 (ягодицы)", priority: ["glutes", "legs", "core"] },
+      { type: "Верх 1 — push (грудь, плечи)", primary: ["chest", "shoulders"], filler: ["arms", "core"] },
+      { type: "Низ 1 — квадрицепс", primary: ["legs"], filler: ["glutes", "core"] },
+      { type: "Верх 2 — pull (спина, бицепс)", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Низ 2 — ягодицы", primary: ["glutes"], filler: ["legs", "core"] },
     ],
   },
   5: {
-    name: "Push / Pull / Legs + Upper / Lower",
+    name: "Push / Pull / Legs + Верх / Низ",
     sessions: [
-      { type: "Толкай (грудь, плечи, трицепс)", priority: ["chest", "shoulders", "arms"] },
-      { type: "Тяни (спина, бицепс)", priority: ["back", "arms", "core"] },
-      { type: "Ноги (квадрицепс)", priority: ["legs", "glutes", "core"] },
-      { type: "Верх", priority: ["chest", "back", "shoulders", "arms"] },
-      { type: "Низ (ягодицы)", priority: ["glutes", "legs", "core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Legs — ноги, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
+      { type: "Верх (силовой акцент)", primary: ["chest", "back", "shoulders"], filler: ["arms", "core"] },
+      { type: "Низ (объёмный)", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
 };
@@ -820,17 +952,22 @@ function phaseFor(weekIndex0: number): PhaseModifier {
   }
 }
 
-// Подбор упражнений с заданным приоритетом групп мышц (для сессии курса)
+// Подбор упражнений строго по группам мышц дня (для сплитовой тренировки).
+// primary — основные мышцы дня (фильтруем по ним), filler — добивка для оставшихся
+// слотов (например, кор после основных подходов).
 function pickForSession(
   pool: Exercise[],
-  priority: Muscle[],
+  primary: Muscle[],
   target: number,
+  filler: Muscle[] = [],
 ): Exercise[] {
   const shuffled = shuffle(pool);
   const picked: Exercise[] = [];
   const usedNames = new Set<string>();
+  const primarySet = new Set(primary);
 
-  for (const m of priority) {
+  // 1) По одному упражнению на каждую основную группу
+  for (const m of primary) {
     if (picked.length >= target) break;
     const found = shuffled.find((e) => e.muscle === m && !usedNames.has(e.name));
     if (found) {
@@ -838,6 +975,29 @@ function pickForSession(
       usedNames.add(found.name);
     }
   }
+
+  // 2) Добиваем оставшиеся слоты (кроме последних 1–2) ещё упражнениями из основных мышц
+  const reserveForFiller = filler.length > 0 ? Math.min(2, target) : 0;
+  while (picked.length < target - reserveForFiller) {
+    const ex = shuffled.find(
+      (e) => primarySet.has(e.muscle) && !usedNames.has(e.name),
+    );
+    if (!ex) break;
+    picked.push(ex);
+    usedNames.add(ex.name);
+  }
+
+  // 3) Заполняем последние слоты добивкой (кор/кардио)
+  for (const m of filler) {
+    if (picked.length >= target) break;
+    const found = shuffled.find((e) => e.muscle === m && !usedNames.has(e.name));
+    if (found) {
+      picked.push(found);
+      usedNames.add(found.name);
+    }
+  }
+
+  // 4) Если всё ещё мало — добиваем чем угодно из пула
   for (const ex of shuffled) {
     if (picked.length >= target) break;
     if (!usedNames.has(ex.name)) {
@@ -845,6 +1005,14 @@ function pickForSession(
       usedNames.add(ex.name);
     }
   }
+
+  // Базовые/тяжёлые упражнения (со штангой/тренажёром) — в начало, кор — в конец
+  picked.sort((a, b) => {
+    const aCore = a.muscle === "core" ? 1 : 0;
+    const bCore = b.muscle === "core" ? 1 : 0;
+    return aCore - bCore;
+  });
+
   return picked;
 }
 
@@ -873,7 +1041,12 @@ export function generateCourse(
   for (let w = 0; w < weeksCount; w++) {
     const mod = phaseFor(w);
     const days: SessionPlan[] = split.sessions.map((s, i) => {
-      const picked = pickForSession(pool, s.priority, Math.min(targetExercises, pool.length));
+      const picked = pickForSession(
+        pool,
+        s.primary,
+        Math.min(targetExercises, pool.length),
+        s.filler,
+      );
       const exercises: ExerciseOut[] = picked.map((ex) => ({
         name: ex.name,
         sets: setsFor(ex, f.level, f.age),
