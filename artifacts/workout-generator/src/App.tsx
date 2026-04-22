@@ -44,7 +44,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
         <header className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             Генератор тренировок
@@ -57,7 +57,7 @@ function App() {
         <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
           <form
             onSubmit={onSubmit}
-            className="rounded-xl border bg-card p-6 shadow-sm space-y-5"
+            className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-5"
           >
             <div className="grid grid-cols-2 gap-4">
               <Field label="Возраст">
@@ -177,21 +177,21 @@ function App() {
             </button>
           </form>
 
-          <div className="rounded-xl border bg-card p-6 shadow-sm">
-            {!result ? (
-              <div className="flex h-full min-h-[300px] items-center justify-center text-center text-muted-foreground">
-                <p>
-                  Заполните форму слева и нажмите
-                  <br />
-                  <span className="font-medium text-foreground">
-                    «Сгенерировать тренировку»
-                  </span>
-                </p>
-              </div>
-            ) : (
+          {result ? (
+            <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
               <ResultView result={result} duration={form.duration} />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="hidden md:flex rounded-xl border bg-card p-6 shadow-sm h-full min-h-[300px] items-center justify-center text-center text-muted-foreground">
+              <p>
+                Заполните форму слева и нажмите
+                <br />
+                <span className="font-medium text-foreground">
+                  «Сгенерировать тренировку»
+                </span>
+              </p>
+            </div>
+          )}
         </div>
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
