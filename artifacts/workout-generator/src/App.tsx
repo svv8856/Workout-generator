@@ -312,6 +312,19 @@ function ResultView({
                   Вес: {ex.weight}
                 </p>
               )}
+              <p className="mt-1.5 text-sm">
+                <span className="mr-1">🎥</span>
+                <span className="font-medium">Как делать:</span>{" "}
+                <span className="text-muted-foreground">{ex.cue}</span>
+              </p>
+              <a
+                href={ex.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                ▶ Видео техники на YouTube
+              </a>
             </div>
           </li>
         ))}
