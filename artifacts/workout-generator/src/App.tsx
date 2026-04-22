@@ -358,7 +358,6 @@ function ResultView({
           ккал
         </p>
       </div>
-
       {result.warnings.length > 0 && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
           <p className="mb-2 text-sm font-semibold text-destructive">
@@ -371,7 +370,6 @@ function ResultView({
           </ul>
         </div>
       )}
-
       {result.focusLabel && (
         <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
           <span className="font-semibold">Фокус сегодня:</span> {result.focusLabel}
@@ -382,18 +380,15 @@ function ResultView({
           )}
         </div>
       )}
-
       {result.summary && (
         <p className="text-xs text-muted-foreground">
           Задействуем: {result.summary}
         </p>
       )}
-
       <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
         <span className="font-semibold">Отдых между упражнениями:</span>{" "}
         {result.restBetween}
       </div>
-
       <ol className="space-y-2">
         {result.exercises.map((ex, i) => (
           <li
@@ -433,9 +428,8 @@ function ResultView({
           </li>
         ))}
       </ol>
-
       <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
-        <p className="mb-2 text-sm font-semibold text-accent-foreground">
+        <p className="mb-2 text-sm font-semibold text-[#593636]">
           Советы по отдыху
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm">
@@ -444,7 +438,6 @@ function ResultView({
           ))}
         </ul>
       </div>
-
       <div className="rounded-lg border border-muted bg-muted/30 p-4 text-xs leading-relaxed text-muted-foreground">
         <p className="mb-1 font-semibold text-foreground">Откуда эти данные</p>
         <p className="mb-2">
