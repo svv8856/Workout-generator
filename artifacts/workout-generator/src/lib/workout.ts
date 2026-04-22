@@ -62,21 +62,21 @@ export interface ExerciseOut {
 }
 
 const setsByLevel: Record<Level, string> = {
-  beginner: "3 × 8–10, отдых 60 сек",
-  intermediate: "4 × 10–12, отдых 45 сек",
-  advanced: "5 × 12–15, отдых 30 сек",
+  beginner: "3 подхода по 8–10 повторений · отдых между подходами 60 сек",
+  intermediate: "4 подхода по 10–12 повторений · отдых между подходами 45 сек",
+  advanced: "5 подходов по 12–15 повторений · отдых между подходами 30 сек",
 };
 
 const cardioByLevel: Record<Level, string> = {
-  beginner: "3 × 30 сек, отдых 60 сек",
-  intermediate: "4 × 45 сек, отдых 45 сек",
-  advanced: "5 × 60 сек, отдых 30 сек",
+  beginner: "3 подхода по 30 сек · отдых между подходами 60 сек",
+  intermediate: "4 подхода по 45 сек · отдых между подходами 45 сек",
+  advanced: "5 подходов по 60 сек · отдых между подходами 30 сек",
 };
 
 const isometricByLevel: Record<Level, string> = {
-  beginner: "3 × 30 сек",
-  intermediate: "4 × 45 сек",
-  advanced: "5 × 60 сек",
+  beginner: "3 подхода по 30 сек удержания · отдых 60 сек",
+  intermediate: "4 подхода по 45 сек удержания · отдых 45 сек",
+  advanced: "5 подходов по 60 сек удержания · отдых 30 сек",
 };
 
 const muscleLabel: Record<Muscle, string> = {
