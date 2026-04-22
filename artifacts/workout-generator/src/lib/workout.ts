@@ -11,6 +11,8 @@ export interface FormData {
   goal: Goal;
   place: Place;
   duration: number;
+  homeDumbbells?: boolean;
+  homeBands?: boolean;
 }
 
 export interface Exercise {
@@ -20,6 +22,8 @@ export interface Exercise {
   needsBar?: boolean;
   needsWeights?: boolean;
   outdoor?: boolean;
+  needsDumbbells?: boolean;
+  needsBands?: boolean;
 }
 
 const setsByLevel: Record<Level, string> = {
@@ -131,6 +135,26 @@ export interface WorkoutResult {
 export function generateWorkout(f: FormData): WorkoutResult {
   let list = pool(f.goal, f.place);
 
+  // Дополнительный инвентарь для дома
+  if (f.place === "home") {
+    if (f.homeDumbbells) {
+      list.push(
+        { name: "Жим гантелей стоя", sets: setsByLevel.beginner, needsDumbbells: true },
+        { name: "Тяга гантели в наклоне", sets: setsByLevel.beginner, needsDumbbells: true },
+        { name: "Приседания с гантелями", sets: setsByLevel.beginner, needsDumbbells: true },
+        { name: "Подъём гантелей на бицепс", sets: setsByLevel.beginner, needsDumbbells: true },
+      );
+    }
+    if (f.homeBands) {
+      list.push(
+        { name: "Тяга резинки к поясу", sets: setsByLevel.beginner, needsBands: true },
+        { name: "Отведение бедра с резинкой", sets: setsByLevel.beginner, needsBands: true },
+        { name: "Жим резинки от груди", sets: setsByLevel.beginner, needsBands: true },
+        { name: "Боковые шаги с резинкой", sets: setsByLevel.beginner, needsBands: true },
+      );
+    }
+  }
+
   // Возрастно-весовое исключение прыжков
   const excludeJumps = f.age > 45 && f.weight > 100;
   if (excludeJumps) {
@@ -139,7 +163,14 @@ export function generateWorkout(f: FormData): WorkoutResult {
 
   // Исключение по месту
   if (f.place === "home") {
-    list = list.filter((e) => !e.needsBar && !e.needsWeights && !e.outdoor);
+    list = list.filter((e) => {
+      if (e.outdoor) return false;
+      if (e.needsBar) return false;
+      if (e.needsWeights) return false;
+      if (e.needsDumbbells && !f.homeDumbbells) return false;
+      if (e.needsBands && !f.homeBands) return false;
+      return true;
+    });
   } else if (f.place === "gym") {
     list = list.filter((e) => !e.outdoor);
   }

@@ -9,6 +9,8 @@ const initialForm: FormData = {
   goal: "strength",
   place: "home",
   duration: 30,
+  homeDumbbells: false,
+  homeBands: false,
 };
 
 const labels = {
@@ -135,6 +137,25 @@ function App() {
                 ))}
               </div>
             </Field>
+
+            {form.place === "home" && (
+              <Field label="Инвентарь дома (необязательно)">
+                <div className="grid grid-cols-2 gap-2">
+                  <Pill
+                    active={!!form.homeDumbbells}
+                    onClick={() => update("homeDumbbells", !form.homeDumbbells)}
+                  >
+                    Гантели
+                  </Pill>
+                  <Pill
+                    active={!!form.homeBands}
+                    onClick={() => update("homeBands", !form.homeBands)}
+                  >
+                    Резинки
+                  </Pill>
+                </div>
+              </Field>
+            )}
 
             <Field label={`Длительность: ${form.duration} мин`}>
               <input
