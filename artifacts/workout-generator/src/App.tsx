@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { generateWorkout, type FormData } from "@/lib/workout";
+import {
+  generateWorkout,
+  generateCourse,
+  type FormData,
+  type Course,
+  type CourseDays,
+  type CourseWeeks,
+} from "@/lib/workout";
+
+type Mode = "single" | "course";
 
 const initialForm: FormData = {
   age: 30,
@@ -30,16 +39,26 @@ const labels = {
 
 function App() {
   const [form, setForm] = useState<FormData>(initialForm);
+  const [mode, setMode] = useState<Mode>("single");
+  const [weeksCount, setWeeksCount] = useState<CourseWeeks>(4);
+  const [daysPerWeek, setDaysPerWeek] = useState<CourseDays>(3);
   const [result, setResult] = useState<ReturnType<typeof generateWorkout> | null>(
     null,
   );
+  const [course, setCourse] = useState<Course | null>(null);
 
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setResult(generateWorkout(form));
+    if (mode === "single") {
+      setResult(generateWorkout(form));
+      setCourse(null);
+    } else {
+      setCourse(generateCourse(form, weeksCount, daysPerWeek));
+      setResult(null);
+    }
   };
 
   return (
@@ -59,6 +78,17 @@ function App() {
             onSubmit={onSubmit}
             className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-5"
           >
+            <Field label="Тип">
+              <div className="grid grid-cols-2 gap-2">
+                <Pill active={mode === "single"} onClick={() => setMode("single")}>
+                  Одна тренировка
+                </Pill>
+                <Pill active={mode === "course"} onClick={() => setMode("course")}>
+                  Курс
+                </Pill>
+              </div>
+            </Field>
+
             <div className="grid grid-cols-2 gap-4">
               <Field label="Возраст">
                 <input
@@ -157,23 +187,60 @@ function App() {
               </Field>
             )}
 
-            <Field label={`Длительность: ${form.duration} мин`}>
-              <input
-                type="range"
-                min={10}
-                max={90}
-                step={5}
-                value={form.duration}
-                onChange={(e) => update("duration", Number(e.target.value))}
-                className="w-full accent-[hsl(var(--primary))]"
-              />
-            </Field>
+            {mode === "single" && (
+              <Field label={`Длительность: ${form.duration} мин`}>
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  step={5}
+                  value={form.duration}
+                  onChange={(e) => update("duration", Number(e.target.value))}
+                  className="w-full accent-[hsl(var(--primary))]"
+                />
+              </Field>
+            )}
+
+            {mode === "course" && (
+              <>
+                <Field label="Длительность курса">
+                  <div className="grid grid-cols-4 gap-2">
+                    {([2, 4, 8, 12] as CourseWeeks[]).map((w) => (
+                      <Pill
+                        key={w}
+                        active={weeksCount === w}
+                        onClick={() => setWeeksCount(w)}
+                      >
+                        {w} нед
+                      </Pill>
+                    ))}
+                  </div>
+                </Field>
+                <Field label="Тренировок в неделю">
+                  <div className="grid grid-cols-4 gap-2">
+                    {([2, 3, 4, 5] as CourseDays[]).map((d) => (
+                      <Pill
+                        key={d}
+                        active={daysPerWeek === d}
+                        onClick={() => setDaysPerWeek(d)}
+                      >
+                        {d}
+                      </Pill>
+                    ))}
+                  </div>
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  Рекомендуем: новичкам — 3 раза/нед, средним — 3–4, продвинутым —
+                  4–5. Оптимальный курс — 4–8 недель.
+                </p>
+              </>
+            )}
 
             <button
               type="submit"
               className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[.99]"
             >
-              Сгенерировать тренировку
+              {mode === "single" ? "Сгенерировать тренировку" : "Построить курс"}
             </button>
           </form>
 
@@ -181,14 +248,14 @@ function App() {
             <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
               <ResultView result={result} duration={form.duration} />
             </div>
+          ) : course ? (
+            <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
+              <CourseView course={course} />
+            </div>
           ) : (
             <div className="hidden md:flex rounded-xl border bg-card p-6 shadow-sm h-full min-h-[300px] items-center justify-center text-center text-muted-foreground">
               <p>
-                Заполните форму слева и нажмите
-                <br />
-                <span className="font-medium text-foreground">
-                  «Сгенерировать тренировку»
-                </span>
+                Заполните форму слева и нажмите кнопку.
               </p>
             </div>
           )}
@@ -356,6 +423,120 @@ function ResultView({
           проконсультируйтесь с врачом и тренером. Слушайте своё тело и
           останавливайтесь при боли.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function CourseView({ course }: { course: Course }) {
+  const [openWeek, setOpenWeek] = useState<number>(1);
+
+  const phaseColor = (pct: number) => {
+    if (pct >= 100) return "bg-red-500/15 text-red-400 border-red-500/30";
+    if (pct >= 80) return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+    if (pct >= 60) return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+    return "bg-sky-500/15 text-sky-400 border-sky-500/30";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold">Курс на {course.weeksCount} нед</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Сплит: <b>{course.splitName}</b> · {course.daysPerWeek} тренировок в
+          неделю · всего <b>{course.totalSessions}</b> занятий
+        </p>
+      </div>
+
+      <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+        {course.generalTips.map((t, i) => (
+          <p key={i} className="text-xs text-muted-foreground">
+            • {t}
+          </p>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {course.weeks.map((w) => {
+          const isOpen = openWeek === w.week;
+          return (
+            <div key={w.week} className="rounded-lg border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOpenWeek(isOpen ? 0 : w.week)}
+                className="w-full flex items-center justify-between gap-3 px-3 sm:px-4 py-3 text-left hover:bg-muted/40 transition"
+              >
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-semibold">Неделя {w.week}</span>
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded-full border ${phaseColor(w.intensityPct)}`}
+                  >
+                    {w.phase} · {w.intensityPct}%
+                  </span>
+                </div>
+                <span className="text-muted-foreground text-sm">
+                  {isOpen ? "▾" : "▸"}
+                </span>
+              </button>
+
+              {isOpen && (
+                <div className="px-3 sm:px-4 pb-4 space-y-4 border-t bg-background/50">
+                  <p className="text-xs text-muted-foreground pt-3">
+                    {w.description}
+                  </p>
+                  {w.days.map((d) => (
+                    <div key={d.day} className="space-y-2">
+                      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                        <h3 className="font-medium">
+                          День {d.day} · {d.weekday}
+                        </h3>
+                        <span className="text-xs text-muted-foreground">
+                          {d.type}
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="text-left text-xs text-muted-foreground border-b">
+                              <th className="py-1.5 pr-2 font-normal">Упражнение</th>
+                              <th className="py-1.5 px-2 font-normal whitespace-nowrap">Подходы</th>
+                              <th className="py-1.5 pl-2 font-normal whitespace-nowrap">Вес</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {d.exercises.map((ex, i) => (
+                              <tr key={i} className="border-b last:border-0 align-top">
+                                <td className="py-2 pr-2">
+                                  <a
+                                    href={ex.videoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-foreground hover:text-primary hover:underline"
+                                  >
+                                    {ex.name}
+                                  </a>
+                                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                                    {ex.muscle}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2 whitespace-nowrap text-muted-foreground">
+                                  {ex.sets}
+                                </td>
+                                <td className="py-2 pl-2 whitespace-nowrap text-muted-foreground">
+                                  {ex.weight ?? "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

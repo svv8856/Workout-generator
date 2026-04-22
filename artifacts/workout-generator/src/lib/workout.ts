@@ -281,6 +281,7 @@ function ageMetabolismFactor(age: number): number {
 function recommendWeight(
   ex: Exercise,
   f: FormData,
+  loadScale: number = 1.0,
 ): string | undefined {
   if (!ex.load) return undefined;
 
@@ -306,7 +307,7 @@ function recommendWeight(
   // Поправка на возраст
   const ageF = ageStrengthFactor(f.age);
 
-  let lo = base * lvl * gen * goal * ageF;
+  let lo = base * lvl * gen * goal * ageF * loadScale;
   let hi = lo * 1.3;
 
   // Округление до приятных значений
@@ -696,4 +697,234 @@ export function generateWorkout(f: FormData): WorkoutResult {
     restBetween = "30–60 секунд (держим пульс)";
 
   return { exercises, calories, warnings, tips, summary, restBetween };
+}
+
+// =====================================================================
+//                          КУРС ТРЕНИРОВОК
+// =====================================================================
+
+export type CourseDays = 2 | 3 | 4 | 5;
+export type CourseWeeks = 2 | 4 | 8 | 12;
+
+export interface SessionPlan {
+  day: number;
+  weekday: string;
+  type: string;
+  exercises: ExerciseOut[];
+}
+
+export interface WeekPlan {
+  week: number;
+  phase: string;
+  intensityPct: number;
+  description: string;
+  days: SessionPlan[];
+}
+
+export interface Course {
+  weeks: WeekPlan[];
+  totalSessions: number;
+  daysPerWeek: number;
+  weeksCount: number;
+  splitName: string;
+  generalTips: string[];
+}
+
+interface SplitSession {
+  type: string;
+  priority: Muscle[];
+}
+
+const SPLITS: Record<CourseDays, { name: string; sessions: SplitSession[] }> = {
+  2: {
+    name: "Full Body × 2",
+    sessions: [
+      { type: "Всё тело · акцент низ", priority: ["legs", "glutes", "back", "core", "chest"] },
+      { type: "Всё тело · акцент верх", priority: ["chest", "back", "shoulders", "arms", "core"] },
+    ],
+  },
+  3: {
+    name: "Full Body × 3",
+    sessions: [
+      { type: "Всё тело А", priority: ["legs", "chest", "back", "core"] },
+      { type: "Всё тело Б", priority: ["glutes", "shoulders", "arms", "core"] },
+      { type: "Всё тело В", priority: ["legs", "back", "chest", "shoulders", "core"] },
+    ],
+  },
+  4: {
+    name: "Верх / Низ",
+    sessions: [
+      { type: "Верх 1 (грудь, спина)", priority: ["chest", "back", "core", "arms"] },
+      { type: "Низ 1 (квадрицепс)", priority: ["legs", "core", "glutes"] },
+      { type: "Верх 2 (плечи, руки)", priority: ["shoulders", "arms", "back", "core"] },
+      { type: "Низ 2 (ягодицы)", priority: ["glutes", "legs", "core"] },
+    ],
+  },
+  5: {
+    name: "Push / Pull / Legs + Upper / Lower",
+    sessions: [
+      { type: "Толкай (грудь, плечи, трицепс)", priority: ["chest", "shoulders", "arms"] },
+      { type: "Тяни (спина, бицепс)", priority: ["back", "arms", "core"] },
+      { type: "Ноги (квадрицепс)", priority: ["legs", "glutes", "core"] },
+      { type: "Верх", priority: ["chest", "back", "shoulders", "arms"] },
+      { type: "Низ (ягодицы)", priority: ["glutes", "legs", "core"] },
+    ],
+  },
+};
+
+const WEEKDAYS_BY_COUNT: Record<CourseDays, string[]> = {
+  2: ["Понедельник", "Четверг"],
+  3: ["Понедельник", "Среда", "Пятница"],
+  4: ["Понедельник", "Вторник", "Четверг", "Пятница"],
+  5: ["Понедельник", "Вторник", "Среда", "Пятница", "Суббота"],
+};
+
+interface PhaseModifier {
+  phase: string;
+  intensityPct: number;
+  loadScale: number;
+  description: string;
+}
+
+function phaseFor(weekIndex0: number): PhaseModifier {
+  const inCycle = weekIndex0 % 4;
+  switch (inCycle) {
+    case 0:
+      return {
+        phase: "Втягивающая",
+        intensityPct: 60,
+        loadScale: 0.65,
+        description: "Лёгкая неделя: разучиваем технику, веса 60% от рабочих.",
+      };
+    case 1:
+      return {
+        phase: "Рабочая",
+        intensityPct: 80,
+        loadScale: 0.85,
+        description: "Базовая нагрузка, 80% от целевых рабочих весов.",
+      };
+    case 2:
+      return {
+        phase: "Пиковая",
+        intensityPct: 100,
+        loadScale: 1.0,
+        description: "Максимальная неделя цикла: рабочие веса 100%, последний подход «до отказа».",
+      };
+    default:
+      return {
+        phase: "Разгрузочная",
+        intensityPct: 50,
+        loadScale: 0.5,
+        description: "Восстановление: 2 подхода вместо 3–4, веса 50%, без отказа.",
+      };
+  }
+}
+
+// Подбор упражнений с заданным приоритетом групп мышц (для сессии курса)
+function pickForSession(
+  pool: Exercise[],
+  priority: Muscle[],
+  target: number,
+): Exercise[] {
+  const shuffled = shuffle(pool);
+  const picked: Exercise[] = [];
+  const usedNames = new Set<string>();
+
+  for (const m of priority) {
+    if (picked.length >= target) break;
+    const found = shuffled.find((e) => e.muscle === m && !usedNames.has(e.name));
+    if (found) {
+      picked.push(found);
+      usedNames.add(found.name);
+    }
+  }
+  for (const ex of shuffled) {
+    if (picked.length >= target) break;
+    if (!usedNames.has(ex.name)) {
+      picked.push(ex);
+      usedNames.add(ex.name);
+    }
+  }
+  return picked;
+}
+
+export function generateCourse(
+  f: FormData,
+  weeksCount: CourseWeeks,
+  daysPerWeek: CourseDays,
+): Course {
+  const excludeJumps = f.age >= 50 || f.weight >= 100;
+  const seniorMode = f.age >= 65;
+
+  const pool = EXERCISES.filter((e) => {
+    if (!isAllowed(e, f, excludeJumps)) return false;
+    if (seniorMode && e.cardio) {
+      const soft = /эллипс|велотрен|беговая|бег.*месте/i.test(e.name);
+      if (!soft) return false;
+    }
+    return true;
+  });
+
+  const split = SPLITS[daysPerWeek];
+  const weekdays = WEEKDAYS_BY_COUNT[daysPerWeek];
+  const targetExercises = seniorMode ? 4 : daysPerWeek >= 4 ? 5 : 6;
+
+  const weeks: WeekPlan[] = [];
+  for (let w = 0; w < weeksCount; w++) {
+    const mod = phaseFor(w);
+    const days: SessionPlan[] = split.sessions.map((s, i) => {
+      const picked = pickForSession(pool, s.priority, Math.min(targetExercises, pool.length));
+      const exercises: ExerciseOut[] = picked.map((ex) => ({
+        name: ex.name,
+        sets: setsFor(ex, f.level, f.age),
+        muscle: muscleLabel[ex.muscle],
+        weight: recommendWeight(ex, f, mod.loadScale),
+        cue: cueFor(ex.name),
+        videoUrl: videoUrlFor(ex.name),
+      }));
+      return {
+        day: i + 1,
+        weekday: weekdays[i] ?? `День ${i + 1}`,
+        type: s.type,
+        exercises,
+      };
+    });
+
+    weeks.push({
+      week: w + 1,
+      phase: mod.phase,
+      intensityPct: mod.intensityPct,
+      description: mod.description,
+      days,
+    });
+  }
+
+  const generalTips: string[] = [
+    `Курс рассчитан на ${weeksCount} ${weeksCount < 5 ? "недели" : "недель"} по ${daysPerWeek} тренировки в неделю — всего ${weeksCount * daysPerWeek} занятий.`,
+    "Каждые 4 недели повторяется мезоцикл: втягивающая → рабочая → пиковая → разгрузочная. Это база периодизации (Матвеев, Bompa).",
+    "Между тренировками одной группы мышц — минимум 48 часов (72 часа после 50 лет).",
+    "Каждые 2 недели прибавляйте 2.5–5% к рабочему весу, если последний подход даётся легко.",
+    "Если не получается выполнить запланированные повторения — оставайтесь на тех же весах ещё неделю.",
+    "Веса в карточках указаны для пиковой недели (100%). На других неделях они автоматически пересчитаны по фазе.",
+    "Раз в 8–12 недель давайте полную неделю отдыха или активного восстановления.",
+  ];
+  if (f.goal === "fatburn") {
+    generalTips.push(
+      "Для жиросжигания добавьте 2–3 кардио-сессии в неделю (низкая интенсивность 30–45 мин) в дни без силовой.",
+    );
+  }
+  if (f.age >= 50) {
+    generalTips.push(
+      "После 50 лет особенно важна неделя восстановления — не пропускайте её, даже если чувствуете себя хорошо.",
+    );
+  }
+
+  return {
+    weeks,
+    totalSessions: weeksCount * daysPerWeek,
+    daysPerWeek,
+    weeksCount,
+    splitName: split.name,
+    generalTips,
+  };
 }
