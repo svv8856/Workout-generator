@@ -302,6 +302,11 @@ function ResultView({
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">{ex.sets}</p>
+              {ex.weight && (
+                <p className="mt-0.5 text-sm font-medium text-primary">
+                  Вес: {ex.weight}
+                </p>
+              )}
             </div>
           </li>
         ))}

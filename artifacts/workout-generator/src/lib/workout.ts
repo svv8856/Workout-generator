@@ -33,6 +33,15 @@ export interface FormData {
   homeBands?: boolean;
 }
 
+export type LoadType =
+  | "small_isolation" // бицепс, махи, разводка — лёгкая изоляция
+  | "medium_unilateral" // выпады, тяги одной рукой
+  | "medium_press" // жимы гантелей, армейский жим
+  | "compound_dumbbell" // гоблет, румынка с гантелями
+  | "compound_barbell" // присед, жим штанги
+  | "deadlift" // становая
+  | "kettlebell"; // махи гирей
+
 export interface Exercise {
   name: string;
   muscle: Muscle;
@@ -42,12 +51,14 @@ export interface Exercise {
   highImpact?: boolean;
   goals: Goal[];
   minLevel?: Level;
+  load?: LoadType;
 }
 
 export interface ExerciseOut {
   name: string;
   sets: string;
   muscle: string;
+  weight?: string;
 }
 
 const setsByLevel: Record<Level, string> = {
@@ -141,23 +152,23 @@ const EXERCISES: Exercise[] = [
   { name: "Конькобежец (skater)", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["fatburn", "endurance"] },
 
   // === Гантели ===
-  { name: "Приседания с гантелями (гоблет)", muscle: "legs", equipment: "dumbbells", goals: ALL },
-  { name: "Выпады с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL },
-  { name: "Румынская тяга с гантелями", muscle: "glutes", equipment: "dumbbells", goals: ALL },
-  { name: "Зашагивания с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL },
-  { name: "Жим гантелей лёжа (на полу)", muscle: "chest", equipment: "dumbbells", goals: ALL },
-  { name: "Разводка гантелей лёжа", muscle: "chest", equipment: "dumbbells", goals: ALL },
-  { name: "Тяга гантели в наклоне", muscle: "back", equipment: "dumbbells", goals: ALL },
-  { name: "Тяга гантелей в наклоне двумя руками", muscle: "back", equipment: "dumbbells", goals: ALL },
-  { name: "Жим гантелей сидя/стоя", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
-  { name: "Махи гантелями в стороны", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
-  { name: "Махи гантелями в наклоне", muscle: "shoulders", equipment: "dumbbells", goals: ALL },
-  { name: "Подъём гантелей на бицепс", muscle: "arms", equipment: "dumbbells", goals: ALL },
-  { name: "Французский жим с гантелью", muscle: "arms", equipment: "dumbbells", goals: ALL },
-  { name: "«Молотки» с гантелями", muscle: "arms", equipment: "dumbbells", goals: ALL },
-  { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"] },
-  { name: "Турецкий подъём", muscle: "fullbody", equipment: "dumbbells", goals: ["strength"], minLevel: "intermediate" },
-  { name: "Свинг гантелью", muscle: "glutes", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance"] },
+  { name: "Приседания с гантелями (гоблет)", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+  { name: "Выпады с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Румынская тяга с гантелями", muscle: "glutes", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+  { name: "Зашагивания с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Жим гантелей лёжа (на полу)", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Разводка гантелей лёжа", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Тяга гантели в наклоне", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Тяга гантелей в наклоне двумя руками", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Жим гантелей сидя/стоя", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Махи гантелями в стороны", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Махи гантелями в наклоне", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Подъём гантелей на бицепс", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Французский жим с гантелью", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "«Молотки» с гантелями", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"], load: "medium_press" },
+  { name: "Турецкий подъём", muscle: "fullbody", equipment: "dumbbells", goals: ["strength"], minLevel: "intermediate", load: "medium_unilateral" },
+  { name: "Свинг гантелью", muscle: "glutes", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance"], load: "compound_dumbbell" },
 
   // === Резинки ===
   { name: "Тяга резинки к поясу сидя", muscle: "back", equipment: "bands", goals: ALL },
@@ -176,16 +187,16 @@ const EXERCISES: Exercise[] = [
   { name: "Подъёмы прямой ноги с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
 
   // === Зал: штанга / тренажёры ===
-  { name: "Приседания со штангой", muscle: "legs", equipment: "barbell", goals: ALL },
-  { name: "Фронтальные приседания", muscle: "legs", equipment: "barbell", goals: ["strength"], minLevel: "intermediate" },
-  { name: "Жим штанги лёжа", muscle: "chest", equipment: "barbell", goals: ALL },
-  { name: "Жим штанги под углом", muscle: "chest", equipment: "barbell", goals: ALL },
-  { name: "Становая тяга", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "intermediate" },
-  { name: "Румынская тяга со штангой", muscle: "glutes", equipment: "barbell", goals: ALL },
-  { name: "Тяга штанги в наклоне", muscle: "back", equipment: "barbell", goals: ALL },
-  { name: "Армейский жим", muscle: "shoulders", equipment: "barbell", goals: ALL },
-  { name: "Подъём штанги на бицепс", muscle: "arms", equipment: "barbell", goals: ALL },
-  { name: "Жим узким хватом", muscle: "arms", equipment: "barbell", goals: ALL },
+  { name: "Приседания со штангой", muscle: "legs", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Фронтальные приседания", muscle: "legs", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "compound_barbell" },
+  { name: "Жим штанги лёжа", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Жим штанги под углом", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Становая тяга", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "deadlift" },
+  { name: "Румынская тяга со штангой", muscle: "glutes", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Тяга штанги в наклоне", muscle: "back", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Армейский жим", muscle: "shoulders", equipment: "barbell", goals: ALL, load: "medium_press" },
+  { name: "Подъём штанги на бицепс", muscle: "arms", equipment: "barbell", goals: ALL, load: "medium_press" },
+  { name: "Жим узким хватом", muscle: "arms", equipment: "barbell", goals: ALL, load: "compound_barbell" },
 
   { name: "Жим ногами в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
   { name: "Разгибания ног в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
@@ -199,8 +210,8 @@ const EXERCISES: Exercise[] = [
   { name: "Эллипсоид", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
   { name: "Велотренажёр", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
 
-  { name: "Махи гирей", muscle: "glutes", equipment: "kettlebell", cardio: true, goals: ["fatburn", "endurance", "strength"] },
-  { name: "Гоблет-присед с гирей", muscle: "legs", equipment: "kettlebell", goals: ALL },
+  { name: "Махи гирей", muscle: "glutes", equipment: "kettlebell", cardio: true, goals: ["fatburn", "endurance", "strength"], load: "kettlebell" },
+  { name: "Гоблет-присед с гирей", muscle: "legs", equipment: "kettlebell", goals: ALL, load: "kettlebell" },
 
   // === Улица / турник ===
   { name: "Подтягивания прямым хватом", muscle: "back", equipment: "bar", goals: ["strength", "endurance"], minLevel: "intermediate" },
@@ -239,6 +250,60 @@ function isAllowed(
       return ex.equipment === "none" || ex.equipment === "bar";
     }
   }
+}
+
+// Рекомендованный вес снаряда (кг) — от веса пользователя, пола, уровня и типа упражнения
+function recommendWeight(
+  ex: Exercise,
+  f: FormData,
+): string | undefined {
+  if (!ex.load) return undefined;
+
+  // Базовая доля от массы тела (нижняя граница)
+  const ratios: Record<LoadType, number> = {
+    small_isolation: 0.07, // на одну руку
+    medium_unilateral: 0.18, // на одну руку/ногу
+    medium_press: 0.22, // на одну руку (для пары гантелей)
+    compound_dumbbell: 0.35, // одна гантель/гиря двумя руками
+    kettlebell: 0.3,
+    compound_barbell: 0.85, // штанга
+    deadlift: 1.1,
+  };
+  const base = ratios[ex.load] * f.weight;
+
+  // Поправка на уровень
+  const lvl = { beginner: 0.7, intermediate: 1.0, advanced: 1.3 }[f.level];
+  // Поправка на пол
+  const gen = f.gender === "female" ? 0.7 : 1.0;
+  // Поправка на цель (выносливость / жиросжигание — легче)
+  const goal =
+    f.goal === "strength" ? 1.0 : f.goal === "endurance" ? 0.75 : 0.85;
+
+  let lo = base * lvl * gen * goal;
+  let hi = lo * 1.3;
+
+  // Округление до приятных значений
+  const round = (v: number): number => {
+    if (v < 6) return Math.max(1, Math.round(v * 2) / 2); // шаг 0.5
+    if (v < 30) return Math.round(v); // шаг 1
+    return Math.round(v / 2.5) * 2.5; // шаг 2.5
+  };
+  lo = round(lo);
+  hi = round(hi);
+  if (hi <= lo) hi = lo + (lo < 10 ? 1 : 2.5);
+
+  // Подпись с учётом «на руку / штанга / гиря»
+  const isPerHand =
+    ex.load === "small_isolation" ||
+    ex.load === "medium_unilateral" ||
+    ex.load === "medium_press";
+  const suffix = isPerHand
+    ? " на руку"
+    : ex.load === "compound_barbell" || ex.load === "deadlift"
+      ? " (включая гриф)"
+      : "";
+
+  return `≈ ${lo}–${hi} кг${suffix}`;
 }
 
 function setsFor(ex: Exercise, level: Level): string {
@@ -335,6 +400,7 @@ export function generateWorkout(f: FormData): WorkoutResult {
     name: ex.name,
     sets: setsFor(ex, f.level),
     muscle: muscleLabel[ex.muscle],
+    weight: recommendWeight(ex, f),
   }));
 
   // Калории: вес × 0.075 × минуты × поправка
