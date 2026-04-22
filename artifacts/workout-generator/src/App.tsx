@@ -285,6 +285,11 @@ function ResultView({
         </p>
       )}
 
+      <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+        <span className="font-semibold">Отдых между упражнениями:</span>{" "}
+        {result.restBetween}
+      </div>
+
       <ol className="space-y-2">
         {result.exercises.map((ex, i) => (
           <li

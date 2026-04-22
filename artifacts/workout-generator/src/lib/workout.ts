@@ -386,6 +386,7 @@ export interface WorkoutResult {
   warnings: string[];
   tips: string[];
   summary: string;
+  restBetween: string;
 }
 
 export function generateWorkout(f: FormData): WorkoutResult {
@@ -462,5 +463,15 @@ export function generateWorkout(f: FormData): WorkoutResult {
   }
   tips.push("После тренировки — заминка и растяжка 5 минут.");
 
-  return { exercises, calories, warnings, tips, summary };
+  // Отдых между упражнениями
+  const restBetweenByLevel: Record<Level, string> = {
+    beginner: "1.5–2 минуты",
+    intermediate: "60–90 секунд",
+    advanced: "45–60 секунд",
+  };
+  let restBetween = restBetweenByLevel[f.level];
+  if (f.goal === "strength") restBetween += " (можно до 2–3 мин на тяжёлых базовых)";
+  if (f.goal === "fatburn") restBetween = "30–60 секунд (держим пульс)";
+
+  return { exercises, calories, warnings, tips, summary, restBetween };
 }
