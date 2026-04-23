@@ -708,13 +708,21 @@ function CourseView({ course }: { course: Course }) {
                                     href={ex.videoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-foreground hover:text-primary hover:underline"
+                                    className="text-foreground hover:text-primary hover:underline font-medium"
                                   >
                                     {ex.name}
                                   </a>
                                   <div className="text-[11px] text-muted-foreground mt-0.5">
                                     {ex.muscle}
                                   </div>
+                                  {ex.cue && (
+                                    <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                                      <span className="font-medium text-foreground/80">
+                                        Как делать:
+                                      </span>{" "}
+                                      {ex.cue}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="py-2 px-2 whitespace-nowrap text-muted-foreground">
                                   {ex.sets}
