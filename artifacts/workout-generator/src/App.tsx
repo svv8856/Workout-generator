@@ -1,14 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   generateWorkout,
   generateCourse,
   clearWorkoutHistory,
   getHistorySummary,
+  getFullHistory,
+  trainingDaysInLast,
   type FormData,
   type Course,
   type CourseDays,
   type CourseWeeks,
+  type FullHistoryEntry,
 } from "@/lib/workout";
+
+type Theme = "light" | "dark";
+
+function useTheme(): [Theme, (t: Theme) => void] {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+    const saved = window.localStorage.getItem("wg_theme");
+    if (saved === "dark" || saved === "light") return saved;
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+    window.localStorage.setItem("wg_theme", theme);
+  }, [theme]);
+  return [theme, setTheme];
+}
 
 type Mode = "single" | "course";
 
@@ -49,7 +72,13 @@ function App() {
   );
   const [course, setCourse] = useState<Course | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
+  const [theme, setTheme] = useTheme();
+  // historyTick triggers re-read of history after mutations
+  void historyTick;
   const history = getHistorySummary();
+  const fullHistory = getFullHistory();
+  const recentDays = trainingDaysInLast(7);
+  const showCourseSuggestion = mode === "single" && recentDays >= 4;
 
   const update = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -68,13 +97,28 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
-        <header className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            Генератор тренировок
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Подберём 5–6 упражнений под вашу цель, уровень и место занятий.
-          </p>
+        <header className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+              Генератор тренировок
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Подберём 5–6 упражнений под вашу цель, уровень и место занятий.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Переключить тему"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="shrink-0 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition flex items-center gap-2"
+          >
+            <span className="text-base leading-none">
+              {theme === "dark" ? "☀" : "☾"}
+            </span>
+            <span className="hidden sm:inline">
+              {theme === "dark" ? "Светлая" : "Тёмная"}
+            </span>
+          </button>
         </header>
 
         <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
@@ -262,6 +306,24 @@ function App() {
               </div>
             )}
 
+            {showCourseSuggestion && (
+              <div className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2.5 text-xs space-y-1.5">
+                <p>
+                  <b>Вы тренируетесь {recentDays} дней за последнюю неделю.</b>{" "}
+                  Если занимаетесь регулярно — лучше переключиться на режим
+                  «Курс»: там сплит по дням и периодизация (втягивающая →
+                  пиковая → разгрузочная), а не случайные тренировки.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMode("course")}
+                  className="text-accent-foreground bg-accent rounded px-2 py-1 text-[11px] font-medium hover:opacity-90"
+                >
+                  Перейти на курс →
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[.99]"
@@ -286,6 +348,18 @@ function App() {
             </div>
           )}
         </div>
+
+        {fullHistory.length > 0 && (
+          <div className="mt-8">
+            <HistoryCalendar
+              entries={fullHistory}
+              onClear={() => {
+                clearWorkoutHistory();
+                setHistoryTick((t) => t + 1);
+              }}
+            />
+          </div>
+        )}
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
           Это базовые рекомендации. При проблемах со здоровьем
@@ -455,6 +529,99 @@ function ResultView({
         </p>
       </div>
     </div>
+  );
+}
+
+function HistoryCalendar({
+  entries,
+  onClear,
+}: {
+  entries: FullHistoryEntry[];
+  onClear: () => void;
+}) {
+  // Сетка последних 14 дней (новые слева)
+  const days: { date: string; label: string; entry?: FullHistoryEntry }[] = [];
+  const ru = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  const today = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    days.push({
+      date: key,
+      label: `${ru[d.getDay()]}\n${d.getDate()} ${months[d.getMonth()]}`,
+      entry: entries.find((e) => e.date === key),
+    });
+  }
+
+  const focusColor = (focus: string): string => {
+    if (/push/i.test(focus)) return "bg-rose-500/20 border-rose-500/40 text-rose-300";
+    if (/pull/i.test(focus)) return "bg-sky-500/20 border-sky-500/40 text-sky-300";
+    if (/legs|ноги/i.test(focus)) return "bg-emerald-500/20 border-emerald-500/40 text-emerald-300";
+    if (/всё тело|тело/i.test(focus)) return "bg-amber-500/20 border-amber-500/40 text-amber-300";
+    return "bg-primary/20 border-primary/40 text-primary";
+  };
+
+  return (
+    <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
+      <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold">Календарь тренировок</h2>
+          <p className="text-xs text-muted-foreground">
+            Последние 14 дней. Сегодня — слева.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+        >
+          очистить историю
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5">
+        {days.map((d, i) => (
+          <div
+            key={d.date}
+            className={`relative rounded-md border p-1.5 sm:p-2 min-h-[64px] flex flex-col gap-1 ${
+              d.entry
+                ? focusColor(d.entry.focus)
+                : "bg-muted/30 border-border text-muted-foreground"
+            } ${i === 0 ? "ring-2 ring-primary/40" : ""}`}
+            title={d.entry ? d.entry.focus : "День отдыха"}
+          >
+            <div className="text-[10px] leading-tight whitespace-pre-line opacity-80">
+              {d.label}
+            </div>
+            {d.entry ? (
+              <div className="text-[10px] font-semibold leading-tight line-clamp-2">
+                {d.entry.focus.replace(/\s*\([^)]*\)/g, "")}
+              </div>
+            ) : (
+              <div className="text-[10px] opacity-50">отдых</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+        <Legend color="bg-rose-500/40" label="Push" />
+        <Legend color="bg-sky-500/40" label="Pull" />
+        <Legend color="bg-emerald-500/40" label="Legs" />
+        <Legend color="bg-amber-500/40" label="Всё тело" />
+      </div>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-block w-2.5 h-2.5 rounded-sm ${color}`} />
+      {label}
+    </span>
   );
 }
 

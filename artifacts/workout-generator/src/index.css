@@ -77,6 +77,36 @@
   --radius: 0.75rem;
 }
 
+.dark {
+  --background: 222 25% 8%;
+  --foreground: 220 15% 92%;
+
+  --border: 220 15% 22%;
+  --input: 220 15% 22%;
+  --ring: 16 90% 55%;
+
+  --card: 222 22% 12%;
+  --card-foreground: 220 15% 92%;
+
+  --popover: 222 22% 12%;
+  --popover-foreground: 220 15% 92%;
+
+  --primary: 16 90% 58%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 15% 18%;
+  --secondary-foreground: 220 15% 92%;
+
+  --muted: 220 15% 18%;
+  --muted-foreground: 220 10% 65%;
+
+  --accent: 200 85% 55%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 100%;
+}
+
 @layer base {
   * {
     border-color: hsl(var(--border));

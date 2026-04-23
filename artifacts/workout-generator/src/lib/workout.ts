@@ -583,6 +583,52 @@ export function clearWorkoutHistory() {
   } catch {}
 }
 
+export interface FullHistoryEntry {
+  ts: number;
+  date: string; // ISO YYYY-MM-DD
+  dayLabel: string;
+  focus: string;
+  muscles: string[];
+}
+
+const ruWeekdays = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const ruMonths = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+export function getFullHistory(): FullHistoryEntry[] {
+  const entries = loadHistory();
+  // Группируем по дню, оставляя последнюю запись дня (после окна регенерации)
+  const byDay = new Map<string, HistoryEntry>();
+  for (const e of entries) {
+    const d = new Date(e.ts);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    byDay.set(key, e);
+  }
+  return Array.from(byDay.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([date, e]) => {
+      const d = new Date(e.ts);
+      return {
+        ts: e.ts,
+        date,
+        dayLabel: `${ruWeekdays[d.getDay()]}, ${d.getDate()} ${ruMonths[d.getMonth()]}`,
+        focus: e.focus ?? "Тренировка",
+        muscles: e.muscles,
+      };
+    });
+}
+
+// Сколько отдельных дней с тренировками за последние N дней
+export function trainingDaysInLast(days: number): number {
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  const entries = loadHistory().filter((e) => e.ts > cutoff);
+  const set = new Set<string>();
+  for (const e of entries) {
+    const d = new Date(e.ts);
+    set.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+  }
+  return set.size;
+}
+
 export function getHistorySummary(): { lastFocus?: string; lastWhen?: string } {
   const arr = loadHistory();
   // Берём последнюю запись СТАРШЕ окна регенерации
