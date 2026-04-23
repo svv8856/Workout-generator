@@ -556,10 +556,10 @@ function HistoryCalendar({
   }
 
   const focusColor = (focus: string): string => {
-    if (/push/i.test(focus)) return "bg-rose-500/20 border-rose-500/40 text-rose-300";
-    if (/pull/i.test(focus)) return "bg-sky-500/20 border-sky-500/40 text-sky-300";
-    if (/legs|ноги/i.test(focus)) return "bg-emerald-500/20 border-emerald-500/40 text-emerald-300";
-    if (/всё тело|тело/i.test(focus)) return "bg-amber-500/20 border-amber-500/40 text-amber-300";
+    if (/жим/i.test(focus)) return "bg-rose-500/20 border-rose-500/40 text-rose-300";
+    if (/тяга/i.test(focus)) return "bg-sky-500/20 border-sky-500/40 text-sky-300";
+    if (/ноги|низ/i.test(focus)) return "bg-emerald-500/20 border-emerald-500/40 text-emerald-300";
+    if (/всё тело|тело|верх/i.test(focus)) return "bg-amber-500/20 border-amber-500/40 text-amber-300";
     return "bg-primary/20 border-primary/40 text-primary";
   };
 
@@ -607,10 +607,10 @@ function HistoryCalendar({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-        <Legend color="bg-rose-500/40" label="Push" />
-        <Legend color="bg-sky-500/40" label="Pull" />
-        <Legend color="bg-emerald-500/40" label="Legs" />
-        <Legend color="bg-amber-500/40" label="Всё тело" />
+        <Legend color="bg-rose-500/40" label="Жим" />
+        <Legend color="bg-sky-500/40" label="Тяга" />
+        <Legend color="bg-emerald-500/40" label="Ноги" />
+        <Legend color="bg-amber-500/40" label="Всё тело / Верх" />
       </div>
     </div>
   );
