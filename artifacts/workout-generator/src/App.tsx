@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Show, useUser, useClerk } from "@clerk/react";
+import { useLocation } from "wouter";
 import {
   generateWorkout,
   generateCourse,
@@ -6,6 +8,7 @@ import {
   getHistorySummary,
   getFullHistory,
   trainingDaysInLast,
+  subscribeHistory,
   type FormData,
   type Course,
   type CourseDays,
@@ -75,6 +78,7 @@ function App() {
   const [theme, setTheme] = useTheme();
   // historyTick triggers re-read of history after mutations
   void historyTick;
+  useEffect(() => subscribeHistory(() => setHistoryTick((t) => t + 1)), []);
   const history = getHistorySummary();
   const fullHistory = getFullHistory();
   const recentDays = trainingDaysInLast(7);
@@ -106,19 +110,22 @@ function App() {
               Подберём 5–6 упражнений под вашу цель, уровень и место занятий.
             </p>
           </div>
-          <button
-            type="button"
-            aria-label="Переключить тему"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="shrink-0 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition flex items-center gap-2"
-          >
-            <span className="text-base leading-none">
-              {theme === "dark" ? "☀" : "☾"}
-            </span>
-            <span className="hidden sm:inline">
-              {theme === "dark" ? "Светлая" : "Тёмная"}
-            </span>
-          </button>
+          <div className="shrink-0 flex items-center gap-2">
+            <AuthButton />
+            <button
+              type="button"
+              aria-label="Переключить тему"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition flex items-center gap-2"
+            >
+              <span className="text-base leading-none">
+                {theme === "dark" ? "☀" : "☾"}
+              </span>
+              <span className="hidden sm:inline">
+                {theme === "dark" ? "Светлая" : "Тёмная"}
+              </span>
+            </button>
+          </div>
         </header>
 
         <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
@@ -367,6 +374,39 @@ function App() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function AuthButton() {
+  const [, setLocation] = useLocation();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  return (
+    <>
+      <Show when="signed-out">
+        <button
+          type="button"
+          onClick={() => setLocation("/sign-in")}
+          className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition"
+        >
+          Войти
+        </button>
+      </Show>
+      <Show when="signed-in">
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-xs text-muted-foreground max-w-[140px] truncate">
+            {user?.primaryEmailAddress?.emailAddress ?? user?.firstName ?? "Аккаунт"}
+          </span>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition"
+          >
+            Выйти
+          </button>
+        </div>
+      </Show>
+    </>
   );
 }
 

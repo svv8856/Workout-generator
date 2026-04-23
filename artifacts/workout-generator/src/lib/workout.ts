@@ -554,7 +554,20 @@ interface HistoryEntry {
   focus?: string;
 }
 
-function loadHistory(): HistoryEntry[] {
+// ---- Облачная синхронизация (Clerk + API) ----
+let cloudHistory: HistoryEntry[] | null = null;
+let cloudSignedIn = false;
+const historyListeners = new Set<() => void>();
+
+export function subscribeHistory(cb: () => void): () => void {
+  historyListeners.add(cb);
+  return () => historyListeners.delete(cb);
+}
+function notifyHistory() {
+  historyListeners.forEach((l) => l());
+}
+
+function readLocal(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
@@ -567,19 +580,90 @@ function loadHistory(): HistoryEntry[] {
   }
 }
 
-function saveHistoryEntry(muscles: Muscle[], focus?: string) {
+function writeLocal(arr: HistoryEntry[]) {
   if (typeof window === "undefined") return;
   try {
-    const arr = loadHistory();
-    arr.push({ ts: Date.now(), muscles, focus });
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-20)));
   } catch {}
 }
 
+export async function bindCloudHistory(): Promise<void> {
+  cloudSignedIn = true;
+  try {
+    const res = await fetch("/api/history", { credentials: "include" });
+    if (!res.ok) throw new Error("history fetch failed");
+    const remote = (await res.json()) as HistoryEntry[];
+
+    // Если на сервере пусто, а локально есть — переносим однократно
+    const local = readLocal();
+    if (remote.length === 0 && local.length > 0) {
+      await fetch("/api/history/bulk", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items: local }),
+      });
+      cloudHistory = [...local].sort((a, b) => a.ts - b.ts);
+      // локальную историю можно очистить, чтобы избежать смешивания
+      try { window.localStorage.removeItem(HISTORY_KEY); } catch {}
+    } else {
+      cloudHistory = remote;
+    }
+  } catch {
+    cloudHistory = [];
+  }
+  notifyHistory();
+}
+
+export function unbindCloudHistory() {
+  cloudSignedIn = false;
+  cloudHistory = null;
+  notifyHistory();
+}
+
+function loadHistory(): HistoryEntry[] {
+  if (cloudSignedIn && cloudHistory) {
+    const cutoff = Date.now() - 14 * 24 * 3600 * 1000;
+    return cloudHistory.filter((e) => e.ts > cutoff).slice(-20);
+  }
+  return readLocal();
+}
+
+function saveHistoryEntry(muscles: Muscle[], focus?: string) {
+  const entry: HistoryEntry = { ts: Date.now(), muscles, focus };
+  if (cloudSignedIn) {
+    cloudHistory = [...(cloudHistory ?? []), entry].slice(-20);
+    notifyHistory();
+    fetch("/api/history", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
+    return;
+  }
+  if (typeof window === "undefined") return;
+  try {
+    const arr = readLocal();
+    arr.push(entry);
+    writeLocal(arr);
+    notifyHistory();
+  } catch {}
+}
+
 export function clearWorkoutHistory() {
+  if (cloudSignedIn) {
+    cloudHistory = [];
+    notifyHistory();
+    fetch("/api/history", { method: "DELETE", credentials: "include" }).catch(
+      () => {},
+    );
+    return;
+  }
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(HISTORY_KEY);
+    notifyHistory();
   } catch {}
 }
 
