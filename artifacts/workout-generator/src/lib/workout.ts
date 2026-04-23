@@ -652,8 +652,8 @@ const FOCUS_TEMPLATES: Array<{
   primary: Muscle[];
   filler: Muscle[];
 }> = [
-  { label: "Жим — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-  { label: "Тяга — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+  { label: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+  { label: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
   { label: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
 ];
 
@@ -952,27 +952,27 @@ const SPLITS: Record<CourseDays, { name: string; sessions: SplitSession[] }> = {
     ],
   },
   3: {
-    name: "Жим / Тяга / Ноги",
+    name: "Push / Pull / Ноги",
     sessions: [
-      { type: "Жим — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-      { type: "Тяга — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
       { type: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
   4: {
     name: "Верх / Низ × 2",
     sessions: [
-      { type: "Верх 1 — жимовая (грудь, плечи)", primary: ["chest", "shoulders"], filler: ["arms", "core"] },
+      { type: "Верх 1 — push (грудь, плечи)", primary: ["chest", "shoulders"], filler: ["arms", "core"] },
       { type: "Низ 1 — квадрицепс", primary: ["legs"], filler: ["glutes", "core"] },
-      { type: "Верх 2 — тяговая (спина, бицепс)", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Верх 2 — pull (спина, бицепс)", primary: ["back", "arms"], filler: ["core"] },
       { type: "Низ 2 — ягодицы", primary: ["glutes"], filler: ["legs", "core"] },
     ],
   },
   5: {
-    name: "Жим / Тяга / Ноги + Верх / Низ",
+    name: "Push / Pull / Ноги + Верх / Низ",
     sessions: [
-      { type: "Жим — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-      { type: "Тяга — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
       { type: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
       { type: "Верх (силовой акцент)", primary: ["chest", "back", "shoulders"], filler: ["arms", "core"] },
       { type: "Низ (объёмный)", primary: ["legs", "glutes"], filler: ["core"] },
