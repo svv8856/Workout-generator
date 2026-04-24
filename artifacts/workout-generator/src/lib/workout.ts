@@ -53,6 +53,9 @@ export interface Exercise {
   goals: Goal[];
   minLevel?: Level;
   load?: LoadType;
+  // Требует силовую/наклонную скамью — дома обычно нет, поэтому
+  // такие упражнения исключаются для place === "home".
+  needsBench?: boolean;
 }
 
 export interface ExerciseOut {
@@ -217,15 +220,15 @@ const EXERCISES: Exercise[] = [
 
   // --- Грудь ---
   { name: "Жим гантелей лёжа (на полу)", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press" },
-  { name: "Жим гантелей под углом вверх", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press" },
-  { name: "Жим гантелей под углом вниз", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press", minLevel: "intermediate" },
+  { name: "Жим гантелей под углом вверх", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press", needsBench: true },
+  { name: "Жим гантелей под углом вниз", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press", minLevel: "intermediate", needsBench: true },
   { name: "Разводка гантелей лёжа", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Пуловер с гантелью", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+  { name: "Пуловер с гантелью", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell", needsBench: true },
 
   // --- Спина ---
   { name: "Тяга гантели в наклоне одной рукой", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
   { name: "Тяга гантелей в наклоне двумя руками", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press" },
-  { name: "Тяга гантелей лёжа на наклонной (chest-supported)", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Тяга гантелей лёжа на наклонной (chest-supported)", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press", needsBench: true },
   { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"], load: "medium_press" },
 
   // --- Плечи ---
@@ -239,7 +242,7 @@ const EXERCISES: Exercise[] = [
   { name: "Подъём гантелей на бицепс", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
   { name: "«Молотки» с гантелями", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
   { name: "Концентрированный подъём на бицепс", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Сгибания на бицепс на наклонной скамье", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate" },
+  { name: "Сгибания на бицепс на наклонной скамье", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate", needsBench: true },
   { name: "Подъём бицепса с супинацией (Цоттмана)", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate" },
 
   // --- Трицепс ---
@@ -410,6 +413,8 @@ function isAllowed(
 
   switch (f.place) {
     case "home": {
+      // Дома обычно нет силовой/наклонной скамьи
+      if (ex.needsBench) return false;
       if (ex.equipment === "none") return true;
       if (ex.equipment === "dumbbells") return !!f.homeDumbbells;
       if (ex.equipment === "bands") return !!f.homeBands;
