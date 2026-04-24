@@ -669,9 +669,115 @@ function cueFor(name: string): string {
   return "Контролируйте технику и дыхание: выдох на усилии, вдох на возврате.";
 }
 
+// Курированные поисковые запросы для упражнений с непривычными или
+// составными названиями, по которым обычный поиск даёт мусор.
+// Ключ — название упражнения в нижнем регистре; значение — что искать.
+const VIDEO_QUERY_OVERRIDES: Record<string, string> = {
+  "перевёрнутая тяга обратным хватом (под столом)":
+    "inverted row under table bodyweight домашняя тяга под столом",
+  "сгибания на бицепс с рюкзаком": "сгибания на бицепс с рюкзаком техника",
+  "изометрический подъём на бицепс с полотенцем":
+    "изометрический бицепс с полотенцем",
+
+  "жим арнольда": "Arnold press жим Арнольда техника",
+  "арнольд жим с гирей": "Arnold press kettlebell жим Арнольда",
+
+  "подъём бицепса с супинацией (цоттмана)": "Zottman curl бицепс Цоттмана",
+  "сгибания на бицепс на наклонной скамье":
+    "incline dumbbell curl бицепс на наклонной скамье",
+  "концентрированный подъём на бицепс": "concentration curl концентрированный бицепс",
+  "бицепс на скамье скотта": "preacher curl бицепс на скамье Скотта",
+  "бицепс в нижнем блоке": "cable curl бицепс в нижнем блоке",
+  "подъём ez-штанги на бицепс": "EZ bar curl бицепс с EZ-штангой",
+
+  "разгибания на трицепс из-за головы (черепа)":
+    "lying triceps extension skullcrushers черепа техника",
+  "трицепс на блоке (канатная рукоять)":
+    "triceps rope pushdown трицепс с канатом",
+  "трицепс на блоке (прямая рукоять)": "triceps pushdown трицепс на блоке",
+  "трицепс из-за головы на блоке": "overhead cable triceps extension",
+  "французский жим лёжа (черепа)": "skullcrushers французский жим лёжа",
+  "трицепс кикбэк гантелью": "triceps kickback кикбэк гантелью",
+  "трицепс из-за головы с гантелью":
+    "dumbbell overhead triceps extension трицепс из-за головы",
+
+  "тяга т-грифа": "T-bar row тяга Т-грифа",
+  "тяга штанги обратным хватом": "barbell row underhand тяга штанги обратным хватом",
+  "тяга гантелей лёжа на наклонной скамье (chest-supported)":
+    "chest supported dumbbell row тяга гантелей лёжа на наклонной скамье",
+  "тяга верхнего блока обратным хватом":
+    "lat pulldown underhand тяга верхнего блока обратным хватом",
+  "подтягивания нейтральным хватом":
+    "neutral grip pull ups подтягивания параллельным хватом",
+  "подтягивания широким хватом": "wide grip pull ups подтягивания широким хватом",
+  "австралийские подтягивания": "australian pull ups inverted row",
+
+  "гак-присед": "hack squat гак-присед",
+  "жим в гак-машине": "hack squat machine гак-присед",
+  "сисси-приседания": "sissy squat сисси-присед",
+  "нордические сгибания (на бицепс бедра)":
+    "nordic hamstring curl нордические сгибания",
+  "обратные выпады": "reverse lunges обратные выпады",
+  "выпады реверансом": "curtsy lunge реверанс выпад",
+  "болгарские сплит-приседания": "bulgarian split squat болгарские сплит-приседания",
+  "румынская тяга": "romanian deadlift румынская становая",
+  "румынская тяга с гантелями":
+    "dumbbell romanian deadlift румынская с гантелями",
+  "сумо-становая тяга": "sumo deadlift сумо-становая",
+  "становая с гирей": "kettlebell deadlift становая с гирей",
+  "good morning со штангой": "good morning exercise гуд-морнинг",
+  "гуд-морнинг со штангой": "good morning exercise гуд-морнинг",
+
+  "ягодичный мост со штангой (hip thrust)": "barbell hip thrust ягодичный мост",
+  "лягушачий ягодичный мост": "frog pump glute bridge лягушачий мост",
+
+  "трастеры с гантелями": "dumbbell thrusters трастеры техника",
+  "трастеры с гирей": "kettlebell thruster трастер техника",
+
+  "стойка на руках у стены (удержание)": "wall handstand hold стойка на руках",
+  "отжимания в стойке на руках у стены":
+    "wall handstand push up отжимания в стойке на руках",
+  "плиометрические отжимания (с хлопком)":
+    "plyometric push up отжимания с хлопком",
+  "отжимания лучник": "archer push up отжимания лучник",
+  "подтягивания лучник": "archer pull up подтягивания лучник",
+
+  "hollow hold (полая поза)": "hollow body hold полая поза",
+  "птица-собака (bird dog)": "bird dog exercise птица-собака",
+  "y-t-w на животе": "Y T W raises prone shoulders",
+
+  "обратная бабочка (rear delt)": "reverse pec deck обратная бабочка",
+  "сведения в пек-дек (бабочка)": "pec deck бабочка сведения",
+  "пек-дек": "pec deck бабочка",
+
+  "снэтч с гантелью одной рукой": "single arm dumbbell snatch снэтч с гантелью",
+  "эйрбайк (air bike)": "assault bike эйрбайк",
+  "шэдоубоксинг": "shadow boxing шэдоубоксинг",
+
+  "раковина с резинкой (clamshell)":
+    "clamshell exercise раковина с резинкой",
+  "махи ногой в сторону лёжа":
+    "side lying leg raises махи ногой в сторону лёжа",
+
+  "жим из-за головы со штангой сидя":
+    "behind the neck press жим штанги из-за головы",
+  "жим в тренажёре для плеч": "shoulder press machine жим в тренажёре",
+  "жим в тренажёре для груди":
+    "chest press machine жим в тренажёре для груди",
+  "разгибания на резинке вниз": "resistance band triceps pushdown",
+  "сгибания ног стоя с резинкой": "standing leg curl band",
+};
+
 function videoUrlFor(name: string): string {
-  const q = encodeURIComponent(`${name} техника выполнения`);
-  return `https://www.youtube.com/results?search_query=${q}`;
+  const key = name.toLowerCase().trim();
+  let query = VIDEO_QUERY_OVERRIDES[key];
+  if (!query) {
+    // Чистим название: убираем скобочные пояснения вроде «(под столом)»
+    // и одиночные русские слова в скобках, чтобы поиск не путался.
+    const clean = name.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    query = `${clean} техника выполнения`;
+  }
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
 // Возрастная корректировка объёма тренировки
