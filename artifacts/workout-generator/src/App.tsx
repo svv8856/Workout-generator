@@ -166,7 +166,7 @@ function MainApp({
           </div>
         </header>
 
-        <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <form
             onSubmit={onSubmit}
             className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-5"
@@ -1123,63 +1123,69 @@ function CourseView({ course }: { course: Course }) {
                           {d.type}
                         </span>
                       </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm border-collapse">
-                          <thead>
-                            <tr className="text-left text-xs text-muted-foreground border-b">
-                              <th className="py-1.5 pr-2 font-normal">Упражнение</th>
-                              <th className="py-1.5 px-2 font-normal whitespace-nowrap">Подходы</th>
-                              <th className="py-1.5 pl-2 font-normal whitespace-nowrap">Вес</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {d.exercises.map((ex, i) => (
-                              <tr key={i} className="border-b last:border-0 align-top">
-                                <td className="py-2 pr-2">
-                                  <div className="font-medium text-foreground">
-                                    {ex.name}
-                                  </div>
-                                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                                    {ex.muscle}
-                                  </div>
-                                  {ex.cue && (
-                                    <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                                      <span className="font-medium text-foreground/80">
-                                        Как делать:
-                                      </span>{" "}
-                                      {ex.cue}
-                                    </div>
-                                  )}
-                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
-                                    <a
-                                      href={ex.videoYoutube}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-medium text-primary hover:underline"
-                                    >
-                                      ▶ YouTube
-                                    </a>
-                                    <a
-                                      href={ex.videoRutube}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="font-medium text-primary hover:underline"
-                                    >
-                                      ▶ RuTube
-                                    </a>
-                                  </div>
-                                </td>
-                                <td className="py-2 px-2 whitespace-nowrap text-muted-foreground">
-                                  {ex.sets}
-                                </td>
-                                <td className="py-2 pl-2 whitespace-nowrap text-muted-foreground">
-                                  {ex.weight ?? "—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <ol className="space-y-2">
+                        {d.exercises.map((ex, i) => (
+                          <li
+                            key={i}
+                            className="rounded-md border bg-card/40 p-2.5 sm:p-3"
+                          >
+                            <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                              <div className="font-medium text-foreground break-words min-w-0 flex-1">
+                                <span className="text-muted-foreground mr-1">
+                                  {i + 1}.
+                                </span>
+                                {ex.name}
+                              </div>
+                              <span className="text-[11px] text-muted-foreground shrink-0">
+                                {ex.muscle}
+                              </span>
+                            </div>
+
+                            <div className="mt-1.5 grid gap-1 text-[12px] sm:grid-cols-2">
+                              <div className="text-muted-foreground">
+                                <span className="font-medium text-foreground/80">
+                                  Подходы:
+                                </span>{" "}
+                                {ex.sets}
+                              </div>
+                              <div className="text-muted-foreground">
+                                <span className="font-medium text-foreground/80">
+                                  Вес:
+                                </span>{" "}
+                                {ex.weight ?? "—"}
+                              </div>
+                            </div>
+
+                            {ex.cue && (
+                              <div className="mt-1.5 text-[11px] text-muted-foreground leading-snug">
+                                <span className="font-medium text-foreground/80">
+                                  Как делать:
+                                </span>{" "}
+                                {ex.cue}
+                              </div>
+                            )}
+
+                            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                              <a
+                                href={ex.videoYoutube}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary hover:underline"
+                              >
+                                ▶ YouTube
+                              </a>
+                              <a
+                                href={ex.videoRutube}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary hover:underline"
+                              >
+                                ▶ RuTube
+                              </a>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
                     </div>
                   ))}
                 </div>
