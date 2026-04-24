@@ -7,7 +7,8 @@ export type Muscle =
   | "chest"
   | "back"
   | "shoulders"
-  | "arms"
+  | "biceps"
+  | "triceps"
   | "core"
   | "cardio"
   | "glutes"
@@ -86,7 +87,8 @@ const muscleLabel: Record<Muscle, string> = {
   chest: "Грудь",
   back: "Спина",
   shoulders: "Плечи",
-  arms: "Руки",
+  biceps: "Бицепс",
+  triceps: "Трицепс",
   core: "Кор / пресс",
   cardio: "Кардио",
   glutes: "Ягодицы",
@@ -101,47 +103,85 @@ const levelOrder: Record<Level, number> = {
 
 const ALL: Goal[] = ["strength", "endurance", "fatburn"];
 
-// База упражнений — широкий пул для всех мест и инвентаря
+// База упражнений — широкий пул для всех мест и инвентаря.
+// Сгруппирована по инвентарю → мышечной группе. Биц/трицепс разделены строго.
 const EXERCISES: Exercise[] = [
-  // === Без инвентаря (дом / улица / зал — везде) ===
+  // ============================================================
+  // === БЕЗ ИНВЕНТАРЯ (дом / улица / зал) ===
+  // ============================================================
+
+  // --- Ноги (квадрицепс / бицепс бедра / икры) ---
   { name: "Приседания с собственным весом", muscle: "legs", equipment: "none", goals: ALL },
   { name: "Глубокие приседания «сумо»", muscle: "legs", equipment: "none", goals: ALL },
   { name: "Болгарские сплит-приседания", muscle: "legs", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Сисси-приседания у опоры", muscle: "legs", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
   { name: "Выпады на месте", muscle: "legs", equipment: "none", goals: ALL },
   { name: "Выпады в ходьбе", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Обратные выпады", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Реверанс-выпады", muscle: "legs", equipment: "none", goals: ALL },
   { name: "Боковые выпады", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Зашагивания на стул", muscle: "legs", equipment: "none", goals: ALL },
   { name: "Подъёмы на носки", muscle: "legs", equipment: "none", goals: ALL },
+  { name: "Подъём на носки на одной ноге", muscle: "legs", equipment: "none", goals: ALL, minLevel: "intermediate" },
   { name: "Пистолетик (присед на одной ноге)", muscle: "legs", equipment: "none", goals: ["strength"], minLevel: "advanced" },
+  { name: "Сгибание голени «нордик» (партнёр/опора)", muscle: "legs", equipment: "none", goals: ["strength"], minLevel: "advanced" },
 
+  // --- Ягодицы ---
   { name: "Ягодичный мост", muscle: "glutes", equipment: "none", goals: ALL },
   { name: "Ягодичный мост на одной ноге", muscle: "glutes", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Лягушачий мост", muscle: "glutes", equipment: "none", goals: ALL },
   { name: "«Пожарный гидрант»", muscle: "glutes", equipment: "none", goals: ALL },
+  { name: "«Раковина» (clamshell)", muscle: "glutes", equipment: "none", goals: ALL },
   { name: "Махи ногой назад в упоре", muscle: "glutes", equipment: "none", goals: ALL },
+  { name: "Махи ногой в сторону лёжа", muscle: "glutes", equipment: "none", goals: ALL },
 
+  // --- Грудь ---
   { name: "Отжимания от пола", muscle: "chest", equipment: "none", goals: ALL },
   { name: "Отжимания с узкой постановкой", muscle: "chest", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
   { name: "Отжимания с широкой постановкой", muscle: "chest", equipment: "none", goals: ALL },
   { name: "Отжимания с колен", muscle: "chest", equipment: "none", goals: ["endurance", "fatburn"] },
-  { name: "Алмазные отжимания", muscle: "arms", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
-  { name: "Обратные отжимания от стула", muscle: "arms", equipment: "none", goals: ALL },
-  { name: "Отжимания «щука»", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Отжимания с возвышения (от опоры)", muscle: "chest", equipment: "none", goals: ALL },
+  { name: "Отжимания с ногами на возвышении", muscle: "chest", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Отжимания «лучник»", muscle: "chest", equipment: "none", goals: ["strength"], minLevel: "advanced" },
+  { name: "Плиометрические отжимания (с хлопком)", muscle: "chest", equipment: "none", jumping: true, highImpact: true, goals: ["strength"], minLevel: "advanced" },
 
+  // --- Спина (без инвентаря) ---
   { name: "Супермен", muscle: "back", equipment: "none", goals: ALL },
   { name: "Лодочка", muscle: "back", equipment: "none", goals: ALL },
-  { name: "Обратная гиперэкстензия", muscle: "back", equipment: "none", goals: ALL },
+  { name: "Обратная гиперэкстензия лёжа", muscle: "back", equipment: "none", goals: ALL },
+  { name: "Y-T-W подъёмы лёжа на животе", muscle: "back", equipment: "none", goals: ALL },
 
+  // --- Плечи (без инвентаря) ---
+  { name: "Отжимания «щука»", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Стойка на руках у стены — удержание", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Отжимания в стойке на руках у стены", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "advanced" },
+
+  // --- Трицепс (без инвентаря) ---
+  { name: "Алмазные отжимания", muscle: "triceps", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Обратные отжимания от стула", muscle: "triceps", equipment: "none", goals: ALL },
+  { name: "Отжимания с узкой постановкой (трицепсовые)", muscle: "triceps", equipment: "none", goals: ALL },
+
+  // --- Бицепс (без инвентаря) ---
+  { name: "Изометрический подъём на бицепс с полотенцем", muscle: "biceps", equipment: "none", goals: ["endurance"] },
+
+  // --- Кор / пресс (без инвентаря) ---
   { name: "Планка", muscle: "core", equipment: "none", goals: ALL },
   { name: "Боковая планка", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Боковая планка с подъёмом таза", muscle: "core", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
+  { name: "Планка с касанием плеч", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Планка с подъёмом ноги", muscle: "core", equipment: "none", goals: ALL },
   { name: "Скручивания", muscle: "core", equipment: "none", goals: ALL },
   { name: "Обратные скручивания", muscle: "core", equipment: "none", goals: ALL },
   { name: "Велосипед лёжа", muscle: "core", equipment: "none", goals: ALL },
   { name: "«Мёртвый жук»", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Птица-собака (Bird dog)", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Полая удержка (Hollow hold)", muscle: "core", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
   { name: "Складка V-up", muscle: "core", equipment: "none", goals: ["strength", "fatburn"], minLevel: "intermediate" },
   { name: "Русские скручивания", muscle: "core", equipment: "none", goals: ALL },
   { name: "Подъёмы ног лёжа", muscle: "core", equipment: "none", goals: ALL },
-  { name: "Планка с касанием плеч", muscle: "core", equipment: "none", goals: ALL },
+  { name: "Касания носков лёжа", muscle: "core", equipment: "none", goals: ALL },
 
-  // Кардио / прыжковые
+  // --- Кардио / прыжковые ---
   { name: "Прыжки «джампинг джек»", muscle: "cardio", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
   { name: "Берпи", muscle: "fullbody", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
   { name: "Скалолаз (альпинист)", muscle: "core", equipment: "none", cardio: true, goals: ["endurance", "fatburn"] },
@@ -152,74 +192,205 @@ const EXERCISES: Exercise[] = [
   { name: "Запрыгивания на возвышение", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["strength", "fatburn"], minLevel: "intermediate" },
   { name: "Прыжки через скакалку", muscle: "cardio", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["endurance", "fatburn"] },
   { name: "Конькобежец (skater)", muscle: "legs", equipment: "none", jumping: true, cardio: true, highImpact: true, goals: ["fatburn", "endurance"] },
+  { name: "Шэдоубоксинг", muscle: "cardio", equipment: "none", cardio: true, goals: ["endurance", "fatburn"] },
 
-  // === Гантели ===
+  // ============================================================
+  // === ГАНТЕЛИ ===
+  // ============================================================
+
+  // --- Ноги ---
   { name: "Приседания с гантелями (гоблет)", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
   { name: "Выпады с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
-  { name: "Румынская тяга с гантелями", muscle: "glutes", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+  { name: "Обратные выпады с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Болгарский присед с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral", minLevel: "intermediate" },
   { name: "Зашагивания с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Подъём на носки с гантелями", muscle: "legs", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+
+  // --- Ягодицы ---
+  { name: "Румынская тяга с гантелями", muscle: "glutes", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+  { name: "Становая на одной ноге с гантелью", muscle: "glutes", equipment: "dumbbells", goals: ALL, load: "medium_unilateral", minLevel: "intermediate" },
+  { name: "Свинг гантелью", muscle: "glutes", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance"], load: "compound_dumbbell" },
+  { name: "Ягодичный мост с гантелью", muscle: "glutes", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+
+  // --- Грудь ---
   { name: "Жим гантелей лёжа (на полу)", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Жим гантелей под углом вверх", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Жим гантелей под углом вниз", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "medium_press", minLevel: "intermediate" },
   { name: "Разводка гантелей лёжа", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Тяга гантели в наклоне", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
+  { name: "Пуловер с гантелью", muscle: "chest", equipment: "dumbbells", goals: ALL, load: "compound_dumbbell" },
+
+  // --- Спина ---
+  { name: "Тяга гантели в наклоне одной рукой", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_unilateral" },
   { name: "Тяга гантелей в наклоне двумя руками", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Тяга гантелей лёжа на наклонной (chest-supported)", muscle: "back", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"], load: "medium_press" },
+
+  // --- Плечи ---
   { name: "Жим гантелей сидя/стоя", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "medium_press" },
+  { name: "Жим Арнольда", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "medium_press", minLevel: "intermediate" },
   { name: "Махи гантелями в стороны", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
   { name: "Махи гантелями в наклоне", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Подъём гантелей на бицепс", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Французский жим с гантелью", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "«Молотки» с гантелями", muscle: "arms", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
-  { name: "Шраги с гантелями", muscle: "back", equipment: "dumbbells", goals: ["strength"], load: "medium_press" },
-  { name: "Турецкий подъём", muscle: "fullbody", equipment: "dumbbells", goals: ["strength"], minLevel: "intermediate", load: "medium_unilateral" },
-  { name: "Свинг гантелью", muscle: "glutes", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance"], load: "compound_dumbbell" },
+  { name: "Подъёмы гантелей перед собой", muscle: "shoulders", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
 
-  // === Резинки ===
+  // --- Бицепс ---
+  { name: "Подъём гантелей на бицепс", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "«Молотки» с гантелями", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Концентрированный подъём на бицепс", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Сгибания на бицепс на наклонной скамье", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate" },
+  { name: "Подъём бицепса с супинацией (Цоттмана)", muscle: "biceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate" },
+
+  // --- Трицепс ---
+  { name: "Французский жим с гантелью", muscle: "triceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Разгибание из-за головы с гантелью двумя руками", muscle: "triceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Разгибание гантели в наклоне («кикбэк»)", muscle: "triceps", equipment: "dumbbells", goals: ALL, load: "small_isolation" },
+  { name: "Лёжа разгибания гантелей («черепа»)", muscle: "triceps", equipment: "dumbbells", goals: ALL, load: "small_isolation", minLevel: "intermediate" },
+
+  // --- Всё тело ---
+  { name: "Турецкий подъём", muscle: "fullbody", equipment: "dumbbells", goals: ["strength"], minLevel: "intermediate", load: "medium_unilateral" },
+  { name: "Трастер с гантелями (присед + жим)", muscle: "fullbody", equipment: "dumbbells", cardio: true, goals: ["fatburn", "endurance", "strength"], load: "medium_press", minLevel: "intermediate" },
+
+  // ============================================================
+  // === РЕЗИНКИ ===
+  // ============================================================
+
+  // --- Спина ---
   { name: "Тяга резинки к поясу сидя", muscle: "back", equipment: "bands", goals: ALL },
+  { name: "Тяга резинки сверху сидя на полу", muscle: "back", equipment: "bands", goals: ALL },
+  { name: "«Раскрытие» плеч с резинкой", muscle: "back", equipment: "bands", goals: ALL },
+
+  // --- Грудь ---
   { name: "Жим резинки от груди", muscle: "chest", equipment: "bands", goals: ALL },
   { name: "Разводка резинкой стоя", muscle: "chest", equipment: "bands", goals: ALL },
+
+  // --- Плечи ---
   { name: "Жим резинки над головой", muscle: "shoulders", equipment: "bands", goals: ALL },
   { name: "Отведение рук с резинкой", muscle: "shoulders", equipment: "bands", goals: ALL },
-  { name: "Бицепс с резинкой", muscle: "arms", equipment: "bands", goals: ALL },
-  { name: "Трицепс с резинкой из-за головы", muscle: "arms", equipment: "bands", goals: ALL },
+  { name: "Тяга резинки к лицу", muscle: "shoulders", equipment: "bands", goals: ALL },
+
+  // --- Бицепс ---
+  { name: "Бицепс с резинкой", muscle: "biceps", equipment: "bands", goals: ALL },
+
+  // --- Трицепс ---
+  { name: "Трицепс с резинкой из-за головы", muscle: "triceps", equipment: "bands", goals: ALL },
+  { name: "Разгибание резинки вниз стоя (как блок)", muscle: "triceps", equipment: "bands", goals: ALL },
+
+  // --- Ноги / ягодицы ---
   { name: "Приседания с резинкой над коленями", muscle: "legs", equipment: "bands", goals: ALL },
+  { name: "Сгибание ноги стоя с резинкой", muscle: "legs", equipment: "bands", goals: ALL },
   { name: "Боковые шаги с резинкой («краб»)", muscle: "glutes", equipment: "bands", goals: ALL },
   { name: "Отведение бедра с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
   { name: "Ягодичный мост с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
-  { name: "Тяга резинки к лицу", muscle: "shoulders", equipment: "bands", goals: ALL },
-  { name: "«Раскрытие» плеч с резинкой", muscle: "back", equipment: "bands", goals: ALL },
   { name: "Подъёмы прямой ноги с резинкой", muscle: "glutes", equipment: "bands", goals: ALL },
 
-  // === Зал: штанга / тренажёры ===
+  // ============================================================
+  // === ЗАЛ: ШТАНГА ===
+  // ============================================================
+
+  // --- Ноги ---
   { name: "Приседания со штангой", muscle: "legs", equipment: "barbell", goals: ALL, load: "compound_barbell" },
   { name: "Фронтальные приседания", muscle: "legs", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "compound_barbell" },
-  { name: "Жим штанги лёжа", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
-  { name: "Жим штанги под углом", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
-  { name: "Становая тяга", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "deadlift" },
-  { name: "Румынская тяга со штангой", muscle: "glutes", equipment: "barbell", goals: ALL, load: "compound_barbell" },
-  { name: "Тяга штанги в наклоне", muscle: "back", equipment: "barbell", goals: ALL, load: "compound_barbell" },
-  { name: "Армейский жим", muscle: "shoulders", equipment: "barbell", goals: ALL, load: "medium_press" },
-  { name: "Подъём штанги на бицепс", muscle: "arms", equipment: "barbell", goals: ALL, load: "medium_press" },
-  { name: "Жим узким хватом", muscle: "arms", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Сплит-присед со штангой", muscle: "legs", equipment: "barbell", goals: ALL, load: "compound_barbell", minLevel: "intermediate" },
+  { name: "Подъём на носки со штангой", muscle: "legs", equipment: "barbell", goals: ALL, load: "compound_barbell" },
 
+  // --- Ягодицы / спина (тазодоминантные) ---
+  { name: "Становая тяга", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "deadlift" },
+  { name: "Сумо-становая тяга", muscle: "glutes", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "deadlift" },
+  { name: "Румынская тяга со штангой", muscle: "glutes", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Ягодичный мост со штангой (hip thrust)", muscle: "glutes", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "«Гуд морнинг» со штангой", muscle: "glutes", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "compound_barbell" },
+
+  // --- Грудь ---
+  { name: "Жим штанги лёжа", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Жим штанги под углом вверх", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Жим штанги под углом вниз", muscle: "chest", equipment: "barbell", goals: ALL, load: "compound_barbell", minLevel: "intermediate" },
+  { name: "Пуловер со штангой", muscle: "chest", equipment: "barbell", goals: ALL, load: "medium_press" },
+
+  // --- Спина ---
+  { name: "Тяга штанги в наклоне", muscle: "back", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Тяга штанги в наклоне обратным хватом", muscle: "back", equipment: "barbell", goals: ALL, load: "compound_barbell", minLevel: "intermediate" },
+  { name: "Шраги со штангой", muscle: "back", equipment: "barbell", goals: ["strength"], load: "compound_barbell" },
+  { name: "Тяга «снэтч-грипом» с плинтов", muscle: "back", equipment: "barbell", goals: ["strength"], minLevel: "advanced", load: "deadlift" },
+
+  // --- Плечи ---
+  { name: "Армейский жим", muscle: "shoulders", equipment: "barbell", goals: ALL, load: "medium_press" },
+  { name: "Жим штанги из-за головы сидя", muscle: "shoulders", equipment: "barbell", goals: ["strength"], minLevel: "intermediate", load: "medium_press" },
+  { name: "Тяга штанги к подбородку", muscle: "shoulders", equipment: "barbell", goals: ALL, load: "medium_press" },
+
+  // --- Бицепс ---
+  { name: "Подъём штанги на бицепс", muscle: "biceps", equipment: "barbell", goals: ALL, load: "medium_press" },
+  { name: "Подъём EZ-штанги на бицепс", muscle: "biceps", equipment: "barbell", goals: ALL, load: "medium_press" },
+
+  // --- Трицепс ---
+  { name: "Жим узким хватом", muscle: "triceps", equipment: "barbell", goals: ALL, load: "compound_barbell" },
+  { name: "Французский жим со штангой лёжа («черепа»)", muscle: "triceps", equipment: "barbell", goals: ALL, load: "medium_press", minLevel: "intermediate" },
+
+  // ============================================================
+  // === ЗАЛ: ТРЕНАЖЁРЫ ===
+  // ============================================================
+
+  // --- Ноги ---
   { name: "Жим ногами в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
+  { name: "Гак-присед в тренажёре", muscle: "legs", equipment: "machines", goals: ALL, minLevel: "intermediate" },
   { name: "Разгибания ног в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
   { name: "Сгибания ног в тренажёре", muscle: "legs", equipment: "machines", goals: ALL },
+  { name: "Подъём на носки в тренажёре сидя", muscle: "legs", equipment: "machines", goals: ALL },
+
+  // --- Ягодицы ---
+  { name: "Отведение бедра в тренажёре", muscle: "glutes", equipment: "machines", goals: ALL },
+  { name: "Махи назад в кроссовере", muscle: "glutes", equipment: "machines", goals: ALL },
+
+  // --- Спина ---
   { name: "Тяга верхнего блока", muscle: "back", equipment: "machines", goals: ALL },
+  { name: "Тяга верхнего блока обратным хватом", muscle: "back", equipment: "machines", goals: ALL },
   { name: "Горизонтальная тяга в блоке", muscle: "back", equipment: "machines", goals: ALL },
+  { name: "Тяга в Т-грифе", muscle: "back", equipment: "machines", goals: ALL, minLevel: "intermediate" },
+  { name: "Прямые руки в верхнем блоке (пуловер на блоке)", muscle: "back", equipment: "machines", goals: ALL },
+
+  // --- Грудь ---
   { name: "Сведение в кроссовере", muscle: "chest", equipment: "machines", goals: ALL },
-  { name: "Трицепс на блоке", muscle: "arms", equipment: "machines", goals: ALL },
+  { name: "Жим в тренажёре сидя для груди", muscle: "chest", equipment: "machines", goals: ALL },
+  { name: "Сведение «бабочка» (пек-дек)", muscle: "chest", equipment: "machines", goals: ALL },
+
+  // --- Плечи ---
+  { name: "Жим в тренажёре для плеч", muscle: "shoulders", equipment: "machines", goals: ALL },
+  { name: "Махи в стороны в блоке стоя", muscle: "shoulders", equipment: "machines", goals: ALL },
+  { name: "Обратная «бабочка» (rear delt fly)", muscle: "shoulders", equipment: "machines", goals: ALL },
+
+  // --- Бицепс ---
+  { name: "Бицепс в нижнем блоке", muscle: "biceps", equipment: "machines", goals: ALL },
+  { name: "Бицепс на скамье Скотта", muscle: "biceps", equipment: "machines", goals: ALL },
+
+  // --- Трицепс ---
+  { name: "Трицепс на блоке (прямая рукоять)", muscle: "triceps", equipment: "machines", goals: ALL },
+  { name: "Трицепс на блоке канатной рукоятью", muscle: "triceps", equipment: "machines", goals: ALL },
+  { name: "Трицепс из-за головы в блоке", muscle: "triceps", equipment: "machines", goals: ALL },
+
+  // --- Кардио-тренажёры ---
   { name: "Беговая дорожка (интервалы)", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
   { name: "Гребной тренажёр", muscle: "fullbody", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
   { name: "Эллипсоид", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
   { name: "Велотренажёр", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"] },
+  { name: "Эйрбайк (assault bike)", muscle: "cardio", equipment: "machines", cardio: true, goals: ["endurance", "fatburn"], minLevel: "intermediate" },
 
+  // ============================================================
+  // === ГИРИ ===
+  // ============================================================
   { name: "Махи гирей", muscle: "glutes", equipment: "kettlebell", cardio: true, goals: ["fatburn", "endurance", "strength"], load: "kettlebell" },
   { name: "Гоблет-присед с гирей", muscle: "legs", equipment: "kettlebell", goals: ALL, load: "kettlebell" },
+  { name: "Становая тяга с гирей", muscle: "glutes", equipment: "kettlebell", goals: ALL, load: "kettlebell" },
+  { name: "Тяга гири в наклоне одной рукой", muscle: "back", equipment: "kettlebell", goals: ALL, load: "kettlebell" },
+  { name: "Жим гири стоя одной рукой", muscle: "shoulders", equipment: "kettlebell", goals: ALL, load: "kettlebell" },
 
-  // === Улица / турник ===
+  // ============================================================
+  // === УЛИЦА / ТУРНИК / БРУСЬЯ ===
+  // ============================================================
   { name: "Подтягивания прямым хватом", muscle: "back", equipment: "bar", goals: ["strength", "endurance"], minLevel: "intermediate" },
-  { name: "Подтягивания обратным хватом", muscle: "arms", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Подтягивания широким хватом", muscle: "back", equipment: "bar", goals: ["strength"], minLevel: "advanced" },
+  { name: "Подтягивания нейтральным хватом", muscle: "back", equipment: "bar", goals: ["strength", "endurance"], minLevel: "intermediate" },
+  { name: "Подтягивания обратным хватом", muscle: "biceps", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
   { name: "Австралийские подтягивания", muscle: "back", equipment: "bar", goals: ALL },
   { name: "Отжимания на брусьях", muscle: "chest", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
+  { name: "Отжимания на брусьях вертикально (трицепсовые)", muscle: "triceps", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
   { name: "Подъём коленей в висе", muscle: "core", equipment: "bar", goals: ALL },
   { name: "Подъём ног в висе", muscle: "core", equipment: "bar", goals: ["strength"], minLevel: "advanced" },
   { name: "Уголок в упоре на брусьях", muscle: "core", equipment: "bar", goals: ["strength"], minLevel: "intermediate" },
@@ -338,6 +509,80 @@ function recommendWeight(
 function cueFor(name: string): string {
   const n = name.toLowerCase();
   const rules: Array<[RegExp, string]> = [
+    // --- Новые / специфические упражнения (специальные паттерны идут первыми) ---
+    [/трастер/, "Гантели/гири у плеч, присед до параллели → взрывной выход + жим над головой одним движением."],
+    [/гак.*присед/, "Стопы на платформе чуть впереди, спина прижата, опускайтесь до 90° в колене, не отрывайте таз."],
+    [/сплит.*присед/, "Ноги в шахматную стойку, опускайтесь вертикально вниз, заднее колено почти касается пола."],
+    [/сисси/, "Держитесь за опору, опускайтесь назад на носки, разгибая бёдра, колени уходят далеко вперёд."],
+    [/нордик/, "Колени на мягкой опоре, стопы зафиксированы, медленно опускайте корпус вперёд, удерживая прямую линию."],
+    [/обратн.*выпад/, "Шаг назад, опускайтесь до 90° в обоих коленях, корпус вертикально, упор на переднюю ногу."],
+    [/реверанс/, "Шаг по диагонали назад крест-накрест, опускайтесь в выпад, корпус прямой."],
+    [/зашагив|шагив/, "Полная стопа на возвышение, толчок передней ногой (не задней), полное разгибание сверху."],
+    [/лучник/, "Опускаясь, переносите вес на одну руку, вторая прямая в сторону. Чередуйте стороны."],
+    [/плиомет|хлопк/, "Резко выталкивайте корпус вверх, оторвав ладони от пола, мягко приземляйтесь."],
+    [/стойка на рук.*стен.*удерж/, "Ладони на ширине плеч, тело прямое, удерживайте равновесие, дышите ровно."],
+    [/отжим.*стойк.*на рук/, "В стойке у стены опускайте макушку к полу, локти под 45°."],
+    [/лягушач.*мост/, "Стопы вместе, колени в стороны, поднимайте таз сжимая ягодицы."],
+    [/раковин|clamshell/, "Лёжа на боку, колени согнуты, поднимайте верхнее колено, не разворачивая таз."],
+    [/махи.*в сторон.*лёж/, "Лёжа на боку, поднимайте прямую верхнюю ногу до 45°, контролируя движение."],
+    [/y-t-w|y\sтаз/, "Лёжа на животе, поднимайте руки в форме букв Y, T, W, сводя лопатки."],
+    [/птица.*собак|bird ?dog/, "На четвереньках, одновременно вытягивайте противоположные руку и ногу, удерживайте 2 сек."],
+    [/полая|hollow/, "Лёжа на спине, поясница прижата, поднимайте плечи и прямые ноги, удерживайте позу."],
+    [/планк.*подъём.*ног|планк.*ног.*возвыш/, "В планке поочерёдно поднимайте прямую ногу, таз не вращайте."],
+    [/боков.*планк.*подъём.*таз/, "В боковой планке опускайте и поднимайте таз, контролируя движение."],
+    [/касан.*носк/, "Лёжа на спине, прямые ноги вверх, тянитесь руками к носкам, отрывая лопатки."],
+    [/изометр.*полотенц/, "Полотенце под стопу, тяните его на себя силой бицепса, удерживайте натяжение 20–40 сек."],
+    [/концентр.*бицепс/, "Сидя, локоть упирается во внутреннюю сторону бедра, поднимайте гантель строго бицепсом."],
+    [/наклон.*скам.*бицепс|бицепс.*наклон.*скам/, "Сидя на наклонной скамье, руки полностью свисают, поднимайте гантели бицепсом."],
+    [/цоттман|зоттман/, "Поднимаете как обычный бицепс, в верхней точке разворачиваете кисти и опускаете «молотком»."],
+    [/кикбэк|kickback/, "Корпус параллельно полу, плечо прижато, разгибайте только в локте, фиксируя кисть."],
+    [/череп|skullcrush/, "Лёжа, локти зафиксированы вертикально, опускайте снаряд ко лбу, не разводя локти."],
+    [/из-за головы.*гантел|разгиб.*из-за головы/, "Гантель/штангу за голову, локти зафиксированы у головы, разгибаете только в локтевом суставе."],
+    [/пуловер.*блок|прям.*рук.*блок/, "Стоя у блока, прямые руки тянут гриф вниз вдоль корпуса широчайшими."],
+    [/пуловер/, "Лёжа поперёк скамьи, прямые руки с гантелью опускайте за голову, растягивая широчайшие."],
+    [/гуд.*морнинг|good.?morning/, "Штанга на плечах, спина прямая, наклон с ровной спиной до параллели, толчок ягодицами обратно."],
+    [/сумо.*стано|стано.*сумо/, "Ноги шире плеч, носки развёрнуты, хват внутри ног, тяга вертикально вверх."],
+    [/снэтч|снетч|плинт/, "Широкий хват, тяга с возвышения, спина прямая, толчок ногами."],
+    [/тяг.*т-?гриф|т-?гриф/, "Ноги по бокам грифа, наклон 45°, тяните рукоять к низу живота, лопатки сводим."],
+    [/тяг.*обратн.*хват/, "Тяга штанги к поясу хватом снизу, локти прижаты, активная работа широчайших."],
+    [/шраг.*штанг/, "Штанга в опущенных руках, поднимайте плечи строго вверх, без вращения."],
+    [/тяг.*подбородк/, "Хват уже плеч, тяните штангу вдоль корпуса до уровня груди, локти выше кистей."],
+    [/арнольд/, "Гантели у груди ладонями к себе → жим вверх с разворотом, в верхней точке ладони от себя."],
+    [/перед собой|подъём.*перед/, "Поднимайте гантель перед собой до уровня плеч, локоть слегка согнут."],
+    [/жим.*из-за головы.*шт/, "Сидя, штанга на плечах сзади, выжимайте строго вверх, не сводя лопатки до конца."],
+    [/жим.*тренаж.*плеч|тренаж.*для плеч/, "Спина плотно прижата, выжимайте рукояти строго вверх, не разгибая локти до конца."],
+    [/жим.*тренаж.*груд|тренаж.*сид.*для груд/, "Спина прижата, рукояти на уровне груди, жим вперёд, контроль возврата."],
+    [/бабочк.*обратн|rear ?delt|обратн.*бабочк/, "Сидя лицом к спинке, разводите рукояти в стороны до сведения лопаток сзади."],
+    [/бабочк|пек.?дек/, "Локти на уровне плеч, сводите подушки перед грудью, чувствуя сокращение грудных."],
+    [/махи.*в стороны.*блок|махи.*в сторон.*блок|махи.*блок/, "В блоке стоя боком, поднимайте рукоять в сторону до уровня плеча."],
+    [/махи.*назад.*кросс/, "В нижнем блоке стоя, отводите ногу назад, сжимая ягодицу в верхней точке."],
+    [/отвед.*бедр.*тренаж/, "Сидя в тренажёре, разводите бёдра в стороны, пауза в верхней точке."],
+    [/скамь.*скотт|скотт/, "Локти упираются в подушку, поднимайте снаряд бицепсом без раскачки корпуса."],
+    [/нижн.*блок.*бицепс|бицепс.*нижн.*блок/, "Стоя у блока, локти прижаты к корпусу, поднимайте рукоять бицепсом."],
+    [/трицепс.*канат|канат.*рукоят/, "Локти прижаты к корпусу, разгибайте руки и в нижней точке разводите канат в стороны."],
+    [/трицепс.*из-за головы.*блок/, "Лицом от блока, гриф за головой, разгибайте руки строго в локтях."],
+    [/трицепс.*рукоят|трицепс.*блок|трицепс.*пряма/, "Локти прижаты к корпусу, разгибайте только в локтевом суставе, без помощи плеча."],
+    [/тяг.*верхн.*блок.*обратн/, "Хват чуть уже плеч ладонями к себе, тяните гриф к верху груди, локти вниз."],
+    [/тяг.*резинк.*сверх/, "Сидя на полу, резинка над собой, тяните вниз и в стороны, сводя лопатки."],
+    [/жим.*тренаж|жим в тренажёр/, "Спина прижата, контролируемое движение по полной амплитуде."],
+    [/жим.*гир.*стоя/, "Гиря на плече («рекомпозиция»), выжимаете строго вверх, корпус напряжён."],
+    [/тяг.*гир.*наклон/, "Свободная рука на опоре, тяните гирю к поясу, локоть вдоль корпуса."],
+    [/стано.*с гир|стано.*гир/, "Гиря между стоп, спина прямая, поднимайте за счёт ног и тяги бёдрами."],
+    [/нейтрал.*хват|параллел.*хват/, "Хват ладонями друг к другу, тяните до касания перекладины верхом груди."],
+    [/широк.*хват.*подтя|подтя.*широк/, "Хват шире плеч, тянитесь грудью к перекладине, активно сводя лопатки."],
+    [/австралийск/, "Тело прямое под низкой перекладиной, тяните грудь к грифу, лопатки сводим."],
+    [/EZ|еz|ез-штанг/, "EZ-гриф уменьшает нагрузку на запястья, в остальном техника как обычного бицепса со штангой."],
+    [/трицепс.*брус|брус.*вертикал|брус.*трицепс/, "На брусьях держите корпус вертикально, опускайтесь только за счёт сгибания локтей."],
+    [/эйрбайк|assault/, "Работают руки и ноги, удерживайте равномерный темп, спина прямая."],
+    [/шэдоу|тень/, "Имитация боя: лёгкие шаги, удары без полного выпрямления, защита поднята."],
+    [/сгиб.*ног.*стоя.*резинк/, "Стоя, резинка на щиколотке, сгибайте ногу в колене, тяните пятку к ягодице."],
+    [/разгиб.*резинк.*вниз/, "Резинка над головой, локти прижаты, разгибайте руки вниз только в локтях."],
+    [/тренаж.*для груд.*бабочк|сведен.*бабочк/, "Локти на уровне плеч, сводите подушки перед грудью."],
+    [/мост.*штанг|hip ?thrust/, "Лопатки на скамье, штанга на тазу, поднимайте таз до прямой линии корпус-бёдра."],
+    [/чест.*support|тяг.*наклон.*скам|тяг.*на наклон/, "Лёжа грудью на наклонной скамье, тяните гантели к поясу, локти вдоль корпуса."],
+    [/носки.*на одной/, "Стоя на одной ноге у опоры, поднимайтесь на носок максимально высоко."],
+    [/носки.*тренаж|икры.*тренаж|подъём на носк.*тренаж/, "Плечи под валиками, поднимайтесь на носки максимально, в верхней точке пауза."],
+
     [/берпи/, "Присед → упор лёжа → отжимание → прыжок вверх с хлопком. Спина прямая."],
     [/прыж.* присед/, "Присед до параллели → взрывной прыжок вверх → мягкое приземление на полусогнутые."],
     [/запрыгив/, "Полуприсед → мощный прыжок на возвышение, мягко приземляйтесь, спина прямая."],
@@ -478,7 +723,7 @@ function shuffle<T>(arr: T[]): T[] {
 function pickBalanced(pool: Exercise[], goal: Goal, target: number): Exercise[] {
   // Желаемое распределение по типам в зависимости от цели
   const priorityByGoal: Record<Goal, Muscle[]> = {
-    strength: ["legs", "chest", "back", "shoulders", "arms", "core", "glutes"],
+    strength: ["legs", "chest", "back", "shoulders", "biceps", "triceps", "core", "glutes"],
     endurance: ["cardio", "core", "legs", "fullbody", "back", "shoulders", "chest"],
     fatburn: ["cardio", "fullbody", "legs", "glutes", "core", "back", "chest"],
   };
@@ -730,14 +975,16 @@ export function getHistorySummary(): { lastFocus?: string; lastWhen?: string } {
   return {};
 }
 
-// Группы для определения «свежей» сессии (жим/тяга/ноги — классический PPL по-русски)
+// Классический сплит Push / Pull / Ноги.
+// Бицепс и трицепс строго разделены, чтобы не было трицепса на тягу
+// и бицепса на жим (это нарушает принцип сплита).
 const FOCUS_TEMPLATES: Array<{
   label: string;
   primary: Muscle[];
   filler: Muscle[];
 }> = [
-  { label: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-  { label: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+  { label: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "triceps"], filler: ["core"] },
+  { label: "Pull — спина, бицепс", primary: ["back", "biceps"], filler: ["core"] },
   { label: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
 ];
 
@@ -1031,35 +1278,35 @@ const SPLITS: Record<CourseDays, { name: string; sessions: SplitSession[] }> = {
   2: {
     name: "Верх / Низ",
     sessions: [
-      { type: "Верх (грудь, спина, плечи, руки)", primary: ["chest", "back", "shoulders", "arms"], filler: ["core"] },
+      { type: "Верх (грудь, спина, плечи, бицепс, трицепс)", primary: ["chest", "back", "shoulders", "biceps", "triceps"], filler: ["core"] },
       { type: "Низ (ноги, ягодицы)", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
   3: {
     name: "Push / Pull / Ноги",
     sessions: [
-      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "triceps"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "biceps"], filler: ["core"] },
       { type: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
   4: {
     name: "Верх / Низ × 2",
     sessions: [
-      { type: "Верх 1 — push (грудь, плечи)", primary: ["chest", "shoulders"], filler: ["arms", "core"] },
-      { type: "Низ 1 — квадрицепс", primary: ["legs"], filler: ["glutes", "core"] },
-      { type: "Верх 2 — pull (спина, бицепс)", primary: ["back", "arms"], filler: ["core"] },
-      { type: "Низ 2 — ягодицы", primary: ["glutes"], filler: ["legs", "core"] },
+      { type: "Верх 1 — push (грудь, плечи, трицепс)", primary: ["chest", "shoulders", "triceps"], filler: ["core"] },
+      { type: "Низ 1 — квадрицепс-доминантный", primary: ["legs"], filler: ["glutes", "core"] },
+      { type: "Верх 2 — pull (спина, бицепс)", primary: ["back", "biceps"], filler: ["core"] },
+      { type: "Низ 2 — ягодицы-доминантный", primary: ["glutes"], filler: ["legs", "core"] },
     ],
   },
   5: {
     name: "Push / Pull / Ноги + Верх / Низ",
     sessions: [
-      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "arms"], filler: ["core"] },
-      { type: "Pull — спина, бицепс", primary: ["back", "arms"], filler: ["core"] },
+      { type: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "triceps"], filler: ["core"] },
+      { type: "Pull — спина, бицепс", primary: ["back", "biceps"], filler: ["core"] },
       { type: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
-      { type: "Верх (силовой акцент)", primary: ["chest", "back", "shoulders"], filler: ["arms", "core"] },
-      { type: "Низ (объёмный)", primary: ["legs", "glutes"], filler: ["core"] },
+      { type: "Верх (силовой акцент: грудь, спина, плечи)", primary: ["chest", "back", "shoulders"], filler: ["biceps", "triceps", "core"] },
+      { type: "Низ (объёмный: ноги, ягодицы)", primary: ["legs", "glutes"], filler: ["core"] },
     ],
   },
 };
@@ -1113,8 +1360,10 @@ function phaseFor(weekIndex0: number): PhaseModifier {
 }
 
 // Подбор упражнений строго по группам мышц дня (для сплитовой тренировки).
-// primary — основные мышцы дня (фильтруем по ним), filler — добивка для оставшихся
-// слотов (например, кор после основных подходов).
+// primary — основные мышцы дня, filler — допустимая добивка (например, кор).
+// КЛЮЧЕВОЙ ПРИНЦИП: ни при каких условиях не берём упражнение, чья мышца
+// не входит ни в primary, ни в filler. Лучше отдать тренировку короче,
+// чем нарушить логику сплита (никаких ног на тяговый день).
 function pickForSession(
   pool: Exercise[],
   primary: Muscle[],
@@ -1125,8 +1374,9 @@ function pickForSession(
   const picked: Exercise[] = [];
   const usedNames = new Set<string>();
   const primarySet = new Set(primary);
+  const fillerSet = new Set(filler);
 
-  // 1) По одному упражнению на каждую основную группу
+  // 1) По одному упражнению на каждую основную группу — для покрытия всех мышц дня.
   for (const m of primary) {
     if (picked.length >= target) break;
     const found = shuffled.find((e) => e.muscle === m && !usedNames.has(e.name));
@@ -1136,7 +1386,7 @@ function pickForSession(
     }
   }
 
-  // 2) Добиваем оставшиеся слоты (кроме последних 1–2) ещё упражнениями из основных мышц
+  // 2) Добиваем основными группами (кроме последних 1–2 слотов под filler).
   const reserveForFiller = filler.length > 0 ? Math.min(2, target) : 0;
   while (picked.length < target - reserveForFiller) {
     const ex = shuffled.find(
@@ -1147,7 +1397,7 @@ function pickForSession(
     usedNames.add(ex.name);
   }
 
-  // 3) Заполняем последние слоты добивкой (кор/кардио)
+  // 3) Добивка строго из разрешённых filler-групп.
   for (const m of filler) {
     if (picked.length >= target) break;
     const found = shuffled.find((e) => e.muscle === m && !usedNames.has(e.name));
@@ -1157,16 +1407,19 @@ function pickForSession(
     }
   }
 
-  // 4) Если всё ещё мало — добиваем чем угодно из пула
+  // 4) Последний шанс заполнить пустые слоты — ТОЛЬКО из primary или filler,
+  //    никаких посторонних мышц. Если упражнений в пуле не хватает —
+  //    тренировка просто будет короче, и это правильно.
   for (const ex of shuffled) {
     if (picked.length >= target) break;
-    if (!usedNames.has(ex.name)) {
+    if (usedNames.has(ex.name)) continue;
+    if (primarySet.has(ex.muscle) || fillerSet.has(ex.muscle)) {
       picked.push(ex);
       usedNames.add(ex.name);
     }
   }
 
-  // Базовые/тяжёлые упражнения (со штангой/тренажёром) — в начало, кор — в конец
+  // Кор — всегда в конец (как добивка), остальные — в начале.
   picked.sort((a, b) => {
     const aCore = a.muscle === "core" ? 1 : 0;
     const bCore = b.muscle === "core" ? 1 : 0;
