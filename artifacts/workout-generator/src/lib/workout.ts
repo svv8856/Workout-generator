@@ -161,8 +161,10 @@ const EXERCISES: Exercise[] = [
   { name: "Обратные отжимания от стула", muscle: "triceps", equipment: "none", goals: ALL },
   { name: "Отжимания с узкой постановкой (трицепсовые)", muscle: "triceps", equipment: "none", goals: ALL },
 
-  // --- Бицепс (без инвентаря) ---
-  { name: "Изометрический подъём на бицепс с полотенцем", muscle: "biceps", equipment: "none", goals: ["endurance"] },
+  // --- Бицепс (без инвентаря — ограниченный набор, но он есть) ---
+  { name: "Изометрический подъём на бицепс с полотенцем", muscle: "biceps", equipment: "none", goals: ALL },
+  { name: "Сгибания на бицепс с рюкзаком", muscle: "biceps", equipment: "none", goals: ALL },
+  { name: "Перевёрнутая тяга обратным хватом (под столом)", muscle: "biceps", equipment: "none", goals: ALL },
 
   // --- Кор / пресс (без инвентаря) ---
   { name: "Планка", muscle: "core", equipment: "none", goals: ALL },
@@ -1040,11 +1042,19 @@ export function generateWorkout(f: FormData): WorkoutResult {
   let focusNote: string | undefined;
   let picked: Exercise[];
 
-  const scored = FOCUS_TEMPLATES.map((t) => ({
-    t,
-    overlap: t.primary.filter((m) => recent.has(m)).length,
-    poolMatch: pool.filter((e) => t.primary.includes(e.muscle)).length,
-  })).filter((s) => s.poolMatch >= 3); // достаточно упражнений в пуле
+  // Фокус считаем валидным только если в пуле есть хотя бы по одному
+  // упражнению на КАЖДУЮ основную мышцу (иначе заголовок врёт).
+  const scored = FOCUS_TEMPLATES.map((t) => {
+    const perMuscleCount = t.primary.map((m) =>
+      pool.filter((e) => e.muscle === m).length,
+    );
+    return {
+      t,
+      overlap: t.primary.filter((m) => recent.has(m)).length,
+      poolMatch: pool.filter((e) => t.primary.includes(e.muscle)).length,
+      hasAllPrimary: perMuscleCount.every((c) => c >= 1),
+    };
+  }).filter((s) => s.hasAllPrimary && s.poolMatch >= 3);
 
   if (scored.length === 0) {
     // Пул маленький (например, дома без инвентаря) — берём общую балансированную
@@ -1064,7 +1074,16 @@ export function generateWorkout(f: FormData): WorkoutResult {
       Math.min(target, pool.length),
       choice.t.filler,
     );
-    focusLabel = choice.t.label;
+
+    // Заголовок строим из фактически отобранных основных мышц, а не из шаблона.
+    const usedPrimary = choice.t.primary.filter((m) =>
+      picked.some((e) => e.muscle === m),
+    );
+    const prefix = choice.t.label.split(" — ")[0];
+    focusLabel =
+      usedPrimary.length > 0
+        ? `${prefix} — ${usedPrimary.map((m) => muscleLabel[m]).join(", ").toLowerCase()}`
+        : choice.t.label;
 
     if (recent.size === 0) {
       focusNote = "Первая тренировка — выбран случайный фокус. Завтра предложим другие группы мышц.";
