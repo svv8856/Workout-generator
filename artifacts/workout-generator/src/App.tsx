@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
-import { Show, useUser, useClerk } from "@clerk/react";
-import { useLocation } from "wouter";
+import { useEffect, useRef, useState } from "react";
 import {
   generateWorkout,
   generateCourse,
@@ -9,6 +7,14 @@ import {
   getFullHistory,
   trainingDaysInLast,
   subscribeHistory,
+  subscribeProfiles,
+  listProfiles,
+  getActiveProfile,
+  setActiveProfile,
+  createProfile,
+  deleteProfile,
+  renameProfile,
+  type Profile,
   type FormData,
   type Course,
   type CourseDays,
@@ -66,6 +72,34 @@ const labels = {
 };
 
 function App() {
+  const [theme, setTheme] = useTheme();
+  const [activeProfile, setActiveProfileState] = useState<Profile | null>(() =>
+    getActiveProfile(),
+  );
+  useEffect(
+    () =>
+      subscribeProfiles(() => {
+        setActiveProfileState(getActiveProfile());
+      }),
+    [],
+  );
+
+  if (!activeProfile) {
+    return <WelcomeScreen theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")} />;
+  }
+
+  return <MainApp profile={activeProfile} theme={theme} setTheme={setTheme} />;
+}
+
+function MainApp({
+  profile,
+  theme,
+  setTheme,
+}: {
+  profile: Profile;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+}) {
   const [form, setForm] = useState<FormData>(initialForm);
   const [mode, setMode] = useState<Mode>("single");
   const [weeksCount, setWeeksCount] = useState<CourseWeeks>(4);
@@ -75,10 +109,14 @@ function App() {
   );
   const [course, setCourse] = useState<Course | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
-  const [theme, setTheme] = useTheme();
   // historyTick triggers re-read of history after mutations
   void historyTick;
   useEffect(() => subscribeHistory(() => setHistoryTick((t) => t + 1)), []);
+  // При смене профиля сбрасываем результат предыдущего пользователя
+  useEffect(() => {
+    setResult(null);
+    setCourse(null);
+  }, [profile.id]);
   const history = getHistorySummary();
   const fullHistory = getFullHistory();
   const recentDays = trainingDaysInLast(7);
@@ -111,7 +149,7 @@ function App() {
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
-            <AuthButton />
+            <ProfileMenu profile={profile} />
             <button
               type="button"
               aria-label="Переключить тему"
@@ -377,36 +415,379 @@ function App() {
   );
 }
 
-function AuthButton() {
-  const [, setLocation] = useLocation();
-  const { user } = useUser();
-  const { signOut } = useClerk();
+// =====================================================================
+//                        ЭКРАН ПРИВЕТСТВИЯ
+// =====================================================================
+
+function WelcomeScreen({
+  theme,
+  onToggleTheme,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const profiles = listProfiles();
+
+  const onCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      createProfile(name);
+      // активный профиль сменится → App перерисуется
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось создать профиль");
+    }
+  };
+
   return (
-    <>
-      <Show when="signed-out">
-        <button
-          type="button"
-          onClick={() => setLocation("/sign-in")}
-          className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition"
-        >
-          Войти
-        </button>
-      </Show>
-      <Show when="signed-in">
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-xs text-muted-foreground max-w-[140px] truncate">
-            {user?.primaryEmailAddress?.emailAddress ?? user?.firstName ?? "Аккаунт"}
-          </span>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-md px-4 py-10 sm:py-16">
+        <div className="flex justify-end mb-6">
           <button
             type="button"
-            onClick={() => signOut()}
+            aria-label="Переключить тему"
+            onClick={onToggleTheme}
             className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition"
           >
-            Выйти
+            <span className="text-base leading-none">
+              {theme === "dark" ? "☀" : "☾"}
+            </span>
           </button>
         </div>
-      </Show>
-    </>
+
+        <div className="rounded-2xl border bg-card p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Добро пожаловать
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Как к вам обращаться? Имя сохранится на устройстве — все
+              тренировки будут привязаны к нему. Можно создать несколько
+              профилей (например, для семьи).
+            </p>
+          </div>
+
+          <form onSubmit={onCreate} className="space-y-3">
+            <div>
+              <label htmlFor="welcome-name" className="mb-1.5 block text-sm font-medium">
+                Ваше имя
+              </label>
+              <input
+                id="welcome-name"
+                autoFocus
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
+                }}
+                placeholder="Например, Анна"
+                maxLength={40}
+                className={inputClass}
+              />
+              {error && (
+                <p className="mt-1.5 text-xs text-destructive">{error}</p>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={!name.trim()}
+              className="w-full rounded-lg bg-primary py-3 font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[.99] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Продолжить
+            </button>
+          </form>
+
+          {profiles.length > 0 && (
+            <div className="pt-2 border-t space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Или войдите как существующий пользователь:
+              </p>
+              <ul className="space-y-1.5">
+                {profiles.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveProfile(p.id)}
+                      className="w-full text-left rounded-lg border bg-background px-3 py-2 text-sm hover:bg-muted/60 transition flex items-center justify-between"
+                    >
+                      <span className="font-medium">{p.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        войти →
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Все данные хранятся только на этом устройстве. Ничего не передаётся в
+          интернет.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+//                          МЕНЮ ПРОФИЛЯ
+// =====================================================================
+
+function ProfileMenu({ profile }: { profile: Profile }) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"menu" | "add" | "rename" | "confirm-delete">(
+    "menu",
+  );
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [profilesTick, setProfilesTick] = useState(0);
+  void profilesTick;
+  useEffect(() => subscribeProfiles(() => setProfilesTick((t) => t + 1)), []);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Закрытие при клике вне
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        closeMenu();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const closeMenu = () => {
+    setOpen(false);
+    setView("menu");
+    setDraft("");
+    setError(null);
+  };
+
+  const profiles = listProfiles();
+  const others = profiles.filter((p) => p.id !== profile.id);
+
+  const onSwitch = (id: string) => {
+    setActiveProfile(id);
+    closeMenu();
+  };
+
+  const onAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      createProfile(draft);
+      closeMenu();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    }
+  };
+
+  const onRename = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      renameProfile(profile.id, draft);
+      closeMenu();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    }
+  };
+
+  const onDelete = () => {
+    deleteProfile(profile.id);
+    closeMenu();
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => (open ? closeMenu() : setOpen(true))}
+        className="rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted/60 transition flex items-center gap-2"
+        aria-expanded={open}
+      >
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
+          aria-hidden="true"
+        >
+          {profile.name.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="hidden sm:inline max-w-[120px] truncate font-medium">
+          {profile.name}
+        </span>
+        <span className="text-xs text-muted-foreground">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-20 mt-2 w-72 rounded-xl border bg-card p-3 shadow-lg text-sm">
+          {view === "menu" && (
+            <>
+              <div className="px-2 pb-2 mb-2 border-b">
+                <p className="text-xs text-muted-foreground">Текущий пользователь</p>
+                <p className="font-semibold truncate">{profile.name}</p>
+              </div>
+
+              {others.length > 0 && (
+                <div className="mb-2">
+                  <p className="px-2 pb-1 text-xs text-muted-foreground">
+                    Сменить пользователя
+                  </p>
+                  <ul className="space-y-0.5">
+                    {others.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          onClick={() => onSwitch(p.id)}
+                          className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition flex items-center gap-2"
+                        >
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
+                            {p.name.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="truncate">{p.name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="pt-1 border-t space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView("add");
+                    setDraft("");
+                  }}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                >
+                  + Добавить пользователя
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView("rename");
+                    setDraft(profile.name);
+                  }}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                >
+                  Переименовать «{profile.name}»
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("confirm-delete")}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-destructive/10 text-destructive transition"
+                >
+                  Удалить «{profile.name}»
+                </button>
+              </div>
+            </>
+          )}
+
+          {view === "add" && (
+            <form onSubmit={onAdd} className="space-y-2">
+              <p className="px-1 text-xs text-muted-foreground">
+                Имя нового пользователя
+              </p>
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  setError(null);
+                }}
+                placeholder="Например, Иван"
+                maxLength={40}
+                className={inputClass}
+              />
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setView("menu")}
+                  className="flex-1 rounded-md border bg-background py-2 text-sm hover:bg-muted/60"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={!draft.trim()}
+                  className="flex-1 rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  Создать
+                </button>
+              </div>
+            </form>
+          )}
+
+          {view === "rename" && (
+            <form onSubmit={onRename} className="space-y-2">
+              <p className="px-1 text-xs text-muted-foreground">Новое имя</p>
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  setError(null);
+                }}
+                maxLength={40}
+                className={inputClass}
+              />
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setView("menu")}
+                  className="flex-1 rounded-md border bg-background py-2 text-sm hover:bg-muted/60"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={!draft.trim() || draft.trim() === profile.name}
+                  className="flex-1 rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          )}
+
+          {view === "confirm-delete" && (
+            <div className="space-y-3">
+              <p className="text-sm">
+                Удалить профиль <b>«{profile.name}»</b> вместе со всей его
+                историей тренировок? Это действие нельзя отменить.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setView("menu")}
+                  className="flex-1 rounded-md border bg-background py-2 text-sm hover:bg-muted/60"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="flex-1 rounded-md bg-destructive py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90"
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

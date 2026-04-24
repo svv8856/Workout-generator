@@ -792,7 +792,9 @@ export interface WorkoutResult {
 //                    ИСТОРИЯ ТРЕНИРОВОК (для не-повторения)
 // =====================================================================
 
-const HISTORY_KEY = "wg_history_v1";
+const HISTORY_KEY_BASE = "wg_history_v1";
+const PROFILES_KEY = "wg_profiles_v1";
+const ACTIVE_PROFILE_KEY = "wg_active_profile_v1";
 const REGEN_WINDOW_MS = 30 * 60 * 1000; // 30 минут — окно «регенерации», не считаем
 
 interface HistoryEntry {
@@ -801,23 +803,157 @@ interface HistoryEntry {
   focus?: string;
 }
 
-// ---- Облачная синхронизация (Clerk + API) ----
-let cloudHistory: HistoryEntry[] | null = null;
-let cloudSignedIn = false;
+// ---- Локальные профили пользователей (на устройстве) ----
+//
+// Идея: в приложении может быть несколько «пользователей» (например, муж/жена).
+// Каждый профиль — это имя + свой ключ хранилища истории.
+// Никакого облака, никакой регистрации. Всё лежит в localStorage.
+
+export interface Profile {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 const historyListeners = new Set<() => void>();
+const profileListeners = new Set<() => void>();
 
 export function subscribeHistory(cb: () => void): () => void {
   historyListeners.add(cb);
-  return () => historyListeners.delete(cb);
+  return () => {
+    historyListeners.delete(cb);
+  };
 }
+
+export function subscribeProfiles(cb: () => void): () => void {
+  profileListeners.add(cb);
+  return () => {
+    profileListeners.delete(cb);
+  };
+}
+
 function notifyHistory() {
   historyListeners.forEach((l) => l());
 }
 
-function readLocal(): HistoryEntry[] {
+function notifyProfiles() {
+  profileListeners.forEach((l) => l());
+  // Смена профиля = смена видимой истории
+  notifyHistory();
+}
+
+export function listProfiles(): Profile[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
+    const raw = window.localStorage.getItem(PROFILES_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as Profile[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeProfiles(arr: Profile[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PROFILES_KEY, JSON.stringify(arr));
+  } catch {}
+}
+
+export function getActiveProfileId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(ACTIVE_PROFILE_KEY);
+}
+
+export function getActiveProfile(): Profile | null {
+  const id = getActiveProfileId();
+  if (!id) return null;
+  return listProfiles().find((p) => p.id === id) ?? null;
+}
+
+export function setActiveProfile(id: string | null) {
+  if (typeof window === "undefined") return;
+  if (id === null) {
+    window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  } else {
+    window.localStorage.setItem(ACTIVE_PROFILE_KEY, id);
+  }
+  notifyProfiles();
+}
+
+export function createProfile(rawName: string): Profile {
+  const name = rawName.trim();
+  if (!name) throw new Error("Введите имя");
+  if (name.length > 40) throw new Error("Слишком длинное имя (макс. 40 символов)");
+  const list = listProfiles();
+  if (list.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error("Профиль с таким именем уже есть");
+  }
+  const profile: Profile = {
+    id: `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    createdAt: Date.now(),
+  };
+
+  // Однократная миграция: если это первый профиль и есть «общая» история
+  // от старой версии приложения — переносим её в этот профиль.
+  if (list.length === 0 && typeof window !== "undefined") {
+    try {
+      const legacy = window.localStorage.getItem(HISTORY_KEY_BASE);
+      if (legacy) {
+        window.localStorage.setItem(`${HISTORY_KEY_BASE}:${profile.id}`, legacy);
+        window.localStorage.removeItem(HISTORY_KEY_BASE);
+      }
+    } catch {}
+  }
+
+  writeProfiles([...list, profile]);
+  setActiveProfile(profile.id);
+  return profile;
+}
+
+export function renameProfile(id: string, rawName: string) {
+  const name = rawName.trim();
+  if (!name) throw new Error("Введите имя");
+  if (name.length > 40) throw new Error("Слишком длинное имя (макс. 40 символов)");
+  const list = listProfiles();
+  if (list.some((p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error("Профиль с таким именем уже есть");
+  }
+  writeProfiles(list.map((p) => (p.id === id ? { ...p, name } : p)));
+  notifyProfiles();
+}
+
+export function deleteProfile(id: string) {
+  if (typeof window === "undefined") return;
+  const list = listProfiles().filter((p) => p.id !== id);
+  writeProfiles(list);
+  // Удаляем историю этого профиля
+  try {
+    window.localStorage.removeItem(`${HISTORY_KEY_BASE}:${id}`);
+  } catch {}
+  // Если удалили активный — переключаем на первый из оставшихся (или сбрасываем)
+  if (getActiveProfileId() === id) {
+    setActiveProfile(list[0]?.id ?? null);
+  } else {
+    notifyProfiles();
+  }
+}
+
+// ---- Чтение / запись истории по активному профилю ----
+
+function historyKey(): string | null {
+  const id = getActiveProfileId();
+  return id ? `${HISTORY_KEY_BASE}:${id}` : null;
+}
+
+function readLocal(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  const key = historyKey();
+  if (!key) return [];
+  try {
+    const raw = window.localStorage.getItem(key);
     if (!raw) return [];
     const arr = JSON.parse(raw) as HistoryEntry[];
     const cutoff = Date.now() - 14 * 24 * 3600 * 1000;
@@ -829,87 +965,34 @@ function readLocal(): HistoryEntry[] {
 
 function writeLocal(arr: HistoryEntry[]) {
   if (typeof window === "undefined") return;
+  const key = historyKey();
+  if (!key) return;
   try {
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-20)));
+    window.localStorage.setItem(key, JSON.stringify(arr.slice(-20)));
   } catch {}
 }
 
-export async function bindCloudHistory(): Promise<void> {
-  cloudSignedIn = true;
-  try {
-    const res = await fetch("/api/history", { credentials: "include" });
-    if (!res.ok) throw new Error("history fetch failed");
-    const remote = (await res.json()) as HistoryEntry[];
-
-    // Если на сервере пусто, а локально есть — переносим однократно
-    const local = readLocal();
-    if (remote.length === 0 && local.length > 0) {
-      await fetch("/api/history/bulk", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items: local }),
-      });
-      cloudHistory = [...local].sort((a, b) => a.ts - b.ts);
-      // локальную историю можно очистить, чтобы избежать смешивания
-      try { window.localStorage.removeItem(HISTORY_KEY); } catch {}
-    } else {
-      cloudHistory = remote;
-    }
-  } catch {
-    cloudHistory = [];
-  }
-  notifyHistory();
-}
-
-export function unbindCloudHistory() {
-  cloudSignedIn = false;
-  cloudHistory = null;
-  notifyHistory();
-}
-
 function loadHistory(): HistoryEntry[] {
-  if (cloudSignedIn && cloudHistory) {
-    const cutoff = Date.now() - 14 * 24 * 3600 * 1000;
-    return cloudHistory.filter((e) => e.ts > cutoff).slice(-20);
-  }
   return readLocal();
 }
 
 function saveHistoryEntry(muscles: Muscle[], focus?: string) {
-  const entry: HistoryEntry = { ts: Date.now(), muscles, focus };
-  if (cloudSignedIn) {
-    cloudHistory = [...(cloudHistory ?? []), entry].slice(-20);
-    notifyHistory();
-    fetch("/api/history", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(entry),
-    }).catch(() => {});
-    return;
-  }
   if (typeof window === "undefined") return;
+  if (!historyKey()) return; // нет активного профиля — не пишем
   try {
     const arr = readLocal();
-    arr.push(entry);
+    arr.push({ ts: Date.now(), muscles, focus });
     writeLocal(arr);
     notifyHistory();
   } catch {}
 }
 
 export function clearWorkoutHistory() {
-  if (cloudSignedIn) {
-    cloudHistory = [];
-    notifyHistory();
-    fetch("/api/history", { method: "DELETE", credentials: "include" }).catch(
-      () => {},
-    );
-    return;
-  }
   if (typeof window === "undefined") return;
+  const key = historyKey();
+  if (!key) return;
   try {
-    window.localStorage.removeItem(HISTORY_KEY);
+    window.localStorage.removeItem(key);
     notifyHistory();
   } catch {}
 }

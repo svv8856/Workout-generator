@@ -25,3 +25,19 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Artifacts
+
+- **artifacts/api-server** — Express API (currently no live frontend consumer; left in place for future use).
+- **artifacts/mockup-sandbox** — Vite preview server for canvas component previews.
+- **artifacts/workout-generator** — «Генератор тренировок», React + Vite, Russian-language workout planner.
+
+## Workout Generator (artifacts/workout-generator)
+
+- **Storage / users**: 100% local on the device. No accounts, no cloud sync, no backend.
+  - Profiles are stored in `localStorage` keys: `wg_profiles_v1`, `wg_active_profile_v1`, and per-profile history in `wg_history_v1:<profileId>`.
+  - Multiple named profiles supported (e.g., family members). Profile API in `src/lib/workout.ts`: `listProfiles`, `createProfile`, `setActiveProfile`, `renameProfile`, `deleteProfile`, `subscribeProfiles`.
+  - On first launch, `WelcomeScreen` asks for a name; profile menu in the header lets the user switch / add / rename / delete profiles.
+  - Designed so it can later be wrapped (e.g., Capacitor) into a mobile app for the App Store / Google Play with no server dependency.
+- **Exercise database**: ~190 exercises in `src/lib/workout.ts`, organised by equipment × muscle. Strict separation of `biceps` / `triceps` (no generic "arms").
+- **Focus methodology**: Push (chest/shoulders/triceps), Pull (back/biceps), Legs (legs/glutes). `pickForSession` only ever picks exercises whose muscle is in the day's `primary` or `filler` lists; missing groups make the session shorter rather than mixing groups across days. Focus label is rebuilt from the muscles actually selected.
