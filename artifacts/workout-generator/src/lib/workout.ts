@@ -61,7 +61,8 @@ export interface ExerciseOut {
   muscle: string;
   weight?: string;
   cue: string;
-  videoUrl: string;
+  videoYoutube: string;
+  videoRutube: string;
 }
 
 const setsByLevel: Record<Level, string> = {
@@ -768,16 +769,24 @@ const VIDEO_QUERY_OVERRIDES: Record<string, string> = {
   "сгибания ног стоя с резинкой": "standing leg curl band",
 };
 
-function videoUrlFor(name: string): string {
+function videoUrlFor(name: string, platform: "youtube" | "rutube"): string {
+  const cleanName = name
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const key = name.toLowerCase().trim();
-  let query = VIDEO_QUERY_OVERRIDES[key];
-  if (!query) {
-    // Чистим название: убираем скобочные пояснения вроде «(под столом)»
-    // и одиночные русские слова в скобках, чтобы поиск не путался.
-    const clean = name.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
-    query = `${clean} техника выполнения`;
+
+  if (platform === "youtube") {
+    // На YouTube часто лучшие ролики — на английском, поэтому используем
+    // курированные запросы (где есть и русские, и английские термины).
+    const query =
+      VIDEO_QUERY_OVERRIDES[key] ?? `${cleanName} техника выполнения`;
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
   }
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+
+  // RuTube — российский сервис, для него используем чистый русский запрос.
+  const query = `${cleanName} техника выполнения`;
+  return `https://rutube.ru/search/?query=${encodeURIComponent(query)}`;
 }
 
 // Возрастная корректировка объёма тренировки
@@ -1301,7 +1310,8 @@ export function generateWorkout(f: FormData): WorkoutResult {
     muscle: muscleLabel[ex.muscle],
     weight: recommendWeight(ex, f),
     cue: cueFor(ex.name),
-    videoUrl: videoUrlFor(ex.name),
+    videoYoutube: videoUrlFor(ex.name, "youtube"),
+    videoRutube: videoUrlFor(ex.name, "rutube"),
   }));
 
   // Калории: расчёт по MET-методу (компендиум Ainsworth)
@@ -1675,7 +1685,8 @@ export function generateCourse(
         muscle: muscleLabel[ex.muscle],
         weight: recommendWeight(ex, f, mod.loadScale),
         cue: cueFor(ex.name),
-        videoUrl: videoUrlFor(ex.name),
+        videoYoutube: videoUrlFor(ex.name, "youtube"),
+        videoRutube: videoUrlFor(ex.name, "rutube"),
       }));
       return {
         day: i + 1,

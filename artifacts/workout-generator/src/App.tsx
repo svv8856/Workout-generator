@@ -911,14 +911,25 @@ function ResultView({
                 <span className="font-medium">Как делать:</span>{" "}
                 <span className="text-muted-foreground">{ex.cue}</span>
               </p>
-              <a
-                href={ex.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                ▶ Видео техники на YouTube
-              </a>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="text-muted-foreground">Видео техники:</span>
+                <a
+                  href={ex.videoYoutube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                  ▶ YouTube
+                </a>
+                <a
+                  href={ex.videoRutube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                  ▶ RuTube
+                </a>
+              </div>
             </div>
           </li>
         ))}
@@ -1125,14 +1136,9 @@ function CourseView({ course }: { course: Course }) {
                             {d.exercises.map((ex, i) => (
                               <tr key={i} className="border-b last:border-0 align-top">
                                 <td className="py-2 pr-2">
-                                  <a
-                                    href={ex.videoUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-foreground hover:text-primary hover:underline font-medium"
-                                  >
+                                  <div className="font-medium text-foreground">
                                     {ex.name}
-                                  </a>
+                                  </div>
                                   <div className="text-[11px] text-muted-foreground mt-0.5">
                                     {ex.muscle}
                                   </div>
@@ -1144,6 +1150,24 @@ function CourseView({ course }: { course: Course }) {
                                       {ex.cue}
                                     </div>
                                   )}
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                                    <a
+                                      href={ex.videoYoutube}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-medium text-primary hover:underline"
+                                    >
+                                      ▶ YouTube
+                                    </a>
+                                    <a
+                                      href={ex.videoRutube}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-medium text-primary hover:underline"
+                                    >
+                                      ▶ RuTube
+                                    </a>
+                                  </div>
                                 </td>
                                 <td className="py-2 px-2 whitespace-nowrap text-muted-foreground">
                                   {ex.sets}
