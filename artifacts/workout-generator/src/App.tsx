@@ -187,7 +187,7 @@ function MainApp({
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={10}
+                  min={16}
                   max={100}
                   value={form.age || ""}
                   onChange={(e) => {
@@ -196,6 +196,9 @@ function MainApp({
                   }}
                   className={inputClass}
                 />
+                <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                  Для младше 16 лет рекомендуем заниматься под присмотром тренера.
+                </p>
               </Field>
               <Field label="Вес, кг">
                 <input
