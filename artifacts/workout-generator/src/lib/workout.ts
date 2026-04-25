@@ -43,6 +43,9 @@ export type LoadType =
   | "deadlift" // становая
   | "kettlebell"; // махи гирей
 
+// Режимы повторений в курсовой периодизации
+type RepsMode = "high" | "normal" | "low" | "deload";
+
 export interface Exercise {
   name: string;
   muscle: Muscle;
@@ -1573,6 +1576,10 @@ interface PhaseModifier {
   phase: string;
   intensityPct: number;
   loadScale: number;
+  // Режим повторений для линейной периодизации (Matveyev/Bompa):
+  // high — больше повторений, лёгкие веса; normal — стандарт уровня;
+  // low — меньше повторений, тяжёлые веса; deload — лёгкое восстановление.
+  repsMode: RepsMode;
   description: string;
 }
 
@@ -1584,30 +1591,87 @@ function phaseFor(weekIndex0: number): PhaseModifier {
         phase: "Втягивающая",
         intensityPct: 60,
         loadScale: 0.65,
-        description: "Лёгкая неделя: разучиваем технику, веса 60% от рабочих.",
+        repsMode: "high",
+        description:
+          "Лёгкая неделя: разучиваем технику, веса 60% от рабочих, больше повторений (12–15) — мышцы и связки готовятся к нагрузке.",
       };
     case 1:
       return {
         phase: "Рабочая",
         intensityPct: 80,
         loadScale: 0.85,
-        description: "Базовая нагрузка, 80% от целевых рабочих весов.",
+        repsMode: "normal",
+        description:
+          "Базовая нагрузка: 80% от целевых рабочих весов, схема повторений по уровню подготовки.",
       };
     case 2:
       return {
         phase: "Пиковая",
         intensityPct: 100,
         loadScale: 1.0,
-        description: "Максимальная неделя цикла: рабочие веса 100%, последний подход «до отказа».",
+        repsMode: "low",
+        description:
+          "Максимум цикла: рабочие веса 100%, повторений меньше (6–8), отдых длиннее — фокус на силу, последний подход «до отказа».",
       };
     default:
       return {
         phase: "Разгрузочная",
         intensityPct: 50,
         loadScale: 0.5,
-        description: "Восстановление: 2 подхода вместо 3–4, веса 50%, без отказа.",
+        repsMode: "deload",
+        description:
+          "Восстановление: 2–3 подхода, веса 50%, повторения 12–15 без отказа — снимаем накопленную усталость перед новым циклом.",
       };
   }
+}
+
+// Применяет режим повторений выбранной фазы к строке вида
+// «3 подхода по 8–10 повторений · отдых между подходами 60 сек».
+// Возрастные группы 50+ имеют собственную (более мягкую) схему,
+// которую мы не перезаписываем — для них волна реализуется
+// только через рабочий вес (loadScale).
+function applyPhaseToReps(base: string, mode: RepsMode): string {
+  if (mode === "normal") return base;
+  if (mode === "high") {
+    return base
+      .replace(/8–10 повторений/, "12–15 повторений")
+      .replace(/10–12 повторений/, "12–15 повторений");
+  }
+  if (mode === "low") {
+    return base
+      .replace(/12–15 повторений/, "8–10 повторений")
+      .replace(/10–12 повторений/, "6–8 повторений")
+      .replace(/8–10 повторений/, "6–8 повторений")
+      .replace(/отдых.*30 сек/, "отдых между подходами 90 сек")
+      .replace(/отдых.*45 сек/, "отдых между подходами 90 сек")
+      .replace(/отдых.*60 сек/, "отдых между подходами 90 сек");
+  }
+  // deload
+  return base
+    .replace(/^5 подходов/, "2 подхода")
+    .replace(/^4 подхода/, "2 подхода")
+    .replace(/^3 подхода/, "2 подхода")
+    .replace(/8–10 повторений/, "12–15 повторений")
+    .replace(/10–12 повторений/, "12–15 повторений");
+}
+
+function setsForCoursePhase(
+  ex: Exercise,
+  level: Level,
+  age: number,
+  repsMode: RepsMode,
+): string {
+  const base = setsFor(ex, level, age);
+  // Для возрастных групп 50+ оставляем безопасную схему — волна идёт через вес
+  if (age >= 50) return base;
+  // Кардио и изометрию (планка) через фазы повторений не варьируем
+  if (ex.cardio) return base;
+  if (
+    ex.muscle === "core" &&
+    (ex.name === "Планка" || ex.name === "Боковая планка")
+  )
+    return base;
+  return applyPhaseToReps(base, repsMode);
 }
 
 // Подбор упражнений строго по группам мышц дня (для сплитовой тренировки).
@@ -1713,7 +1777,7 @@ export function generateCourse(
       );
       const exercises: ExerciseOut[] = picked.map((ex) => ({
         name: ex.name,
-        sets: setsFor(ex, f.level, f.age),
+        sets: setsForCoursePhase(ex, f.level, f.age, mod.repsMode),
         muscle: muscleLabel[ex.muscle],
         weight: recommendWeight(ex, f, mod.loadScale),
         cue: cueFor(ex.name),
@@ -1739,7 +1803,7 @@ export function generateCourse(
 
   const generalTips: string[] = [
     `Курс рассчитан на ${weeksCount} ${weeksCount < 5 ? "недели" : "недель"} по ${daysPerWeek} тренировки в неделю — всего ${weeksCount * daysPerWeek} занятий.`,
-    "Каждые 4 недели повторяется мезоцикл: втягивающая → рабочая → пиковая → разгрузочная. Это база периодизации (Матвеев, Bompa).",
+    "Каждые 4 недели повторяется мезоцикл: втягивающая (12–15 повт., 65%) → рабочая (по уровню, 85%) → пиковая (6–8 повт., 100%) → разгрузочная (12–15 повт., 50%). Линейная периодизация по Матвееву/Bompa: меняются и веса, и повторения.",
     "Между тренировками одной группы мышц — минимум 48 часов (72 часа после 50 лет).",
     "Каждые 2 недели прибавляйте 2.5–5% к рабочему весу, если последний подход даётся легко.",
     "Если не получается выполнить запланированные повторения — оставайтесь на тех же весах ещё неделю.",
