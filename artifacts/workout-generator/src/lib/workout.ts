@@ -156,6 +156,10 @@ const EXERCISES: Exercise[] = [
   { name: "Y-T-W подъёмы лёжа на животе", muscle: "back", equipment: "none", goals: ALL },
 
   // --- Плечи (без инвентаря) ---
+  { name: "Отжимания от стены", muscle: "shoulders", equipment: "none", goals: ALL },
+  { name: "Отжимания от наклонной поверхности (стол/подоконник)", muscle: "shoulders", equipment: "none", goals: ALL },
+  { name: "Махи руками в стороны и вперёд (без веса)", muscle: "shoulders", equipment: "none", goals: ALL },
+  { name: "Y-T-W подъёмы рук стоя", muscle: "shoulders", equipment: "none", goals: ALL },
   { name: "Отжимания «щука»", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
   { name: "Стойка на руках у стены — удержание", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "intermediate" },
   { name: "Отжимания в стойке на руках у стены", muscle: "shoulders", equipment: "none", goals: ["strength"], minLevel: "advanced" },
@@ -1242,23 +1246,36 @@ export function generateWorkout(f: FormData): WorkoutResult {
   // Каждая тренировка — конкретный сплит (жим / тяга / ноги).
   // Это даёт правильное чередование: сегодня ноги — завтра жим или тяга.
   const recent = recentMuscleSet();
+  // Самая последняя «реальная» сессия (после сворачивания регенераций).
+  // Её фокус нужно избегать в первую очередь.
+  const lastEntry = effectiveHistory().slice(-1)[0];
+  const lastMuscles = new Set<Muscle>(lastEntry?.muscles ?? []);
   let focusLabel: string | undefined;
   let focusNote: string | undefined;
   let picked: Exercise[];
 
-  // Фокус считаем валидным только если в пуле есть хотя бы по одному
-  // упражнению на КАЖДУЮ основную мышцу (иначе заголовок врёт).
+  // Фокус считаем валидным, если в пуле есть упражнения хотя бы для
+  // большинства основных мышц шаблона (для шаблонов из 2 мышц — обе,
+  // для шаблонов из 3 — минимум 2). Это позволяет, например, делать
+  // Push (грудь+трицепс) дома, даже если плечевых упражнений мало.
   const scored = FOCUS_TEMPLATES.map((t) => {
     const perMuscleCount = t.primary.map((m) =>
       pool.filter((e) => e.muscle === m).length,
     );
+    const filledMuscles = perMuscleCount.filter((c) => c >= 1).length;
+    const requiredFilled = t.primary.length <= 2 ? t.primary.length : 2;
+    // Шаблон считается «таким же, как прошлая тренировка», если все его
+    // основные мышцы тренировались на прошлой сессии.
+    const isSameAsLast =
+      lastMuscles.size > 0 && t.primary.every((m) => lastMuscles.has(m));
     return {
       t,
       overlap: t.primary.filter((m) => recent.has(m)).length,
+      isSameAsLast,
       poolMatch: pool.filter((e) => t.primary.includes(e.muscle)).length,
-      hasAllPrimary: perMuscleCount.every((c) => c >= 1),
+      hasEnoughPrimary: filledMuscles >= requiredFilled,
     };
-  }).filter((s) => s.hasAllPrimary && s.poolMatch >= 3);
+  }).filter((s) => s.hasEnoughPrimary && s.poolMatch >= 3);
 
   if (scored.length === 0) {
     // Пул маленький (например, дома без инвентаря) — берём общую балансированную
@@ -1266,10 +1283,20 @@ export function generateWorkout(f: FormData): WorkoutResult {
     focusLabel = "Всё тело";
     focusNote = "Доступных упражнений мало — собрали общую тренировку.";
   } else {
-    scored.sort((a, b) => a.overlap - b.overlap || b.poolMatch - a.poolMatch);
-    // Среди вариантов с минимальным пересечением — случайный выбор
-    const minOverlap = scored[0].overlap;
-    const candidates = scored.filter((s) => s.overlap === minOverlap);
+    // Сначала сильно штрафуем шаблон, совпадающий с прошлой тренировкой,
+    // затем минимизируем пересечение с последними сессиями,
+    // затем предпочитаем шаблоны с большим пулом упражнений.
+    scored.sort(
+      (a, b) =>
+        Number(a.isSameAsLast) - Number(b.isSameAsLast) ||
+        a.overlap - b.overlap ||
+        b.poolMatch - a.poolMatch,
+    );
+    const minIsSame = scored[0].isSameAsLast;
+    const minOverlap = scored.find((s) => s.isSameAsLast === minIsSame)!.overlap;
+    const candidates = scored.filter(
+      (s) => s.isSameAsLast === minIsSame && s.overlap === minOverlap,
+    );
     const choice = candidates[Math.floor(Math.random() * candidates.length)];
 
     picked = pickForSession(
