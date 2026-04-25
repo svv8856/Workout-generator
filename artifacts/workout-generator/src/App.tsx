@@ -823,7 +823,7 @@ function Pill({
       type="button"
       onClick={onClick}
       className={
-        "min-w-0 w-full min-h-[40px] rounded-lg border px-1.5 py-1.5 text-[11px] sm:text-sm font-medium leading-tight text-center break-words hyphens-auto flex items-center justify-center transition " +
+        "min-w-0 w-full min-h-[40px] rounded-lg border px-2 py-1.5 text-[10px] sm:text-xs md:text-sm font-medium leading-tight text-center break-words hyphens-auto flex items-center justify-center transition " +
         (active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-input bg-background hover:bg-secondary")
