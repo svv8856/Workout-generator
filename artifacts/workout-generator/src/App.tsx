@@ -186,20 +186,28 @@ function MainApp({
               <Field label="Возраст">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={10}
                   max={100}
-                  value={form.age}
-                  onChange={(e) => update("age", Number(e.target.value))}
+                  value={form.age || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    update("age", v === "" ? 0 : Number(v));
+                  }}
                   className={inputClass}
                 />
               </Field>
               <Field label="Вес, кг">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={30}
                   max={250}
-                  value={form.weight}
-                  onChange={(e) => update("weight", Number(e.target.value))}
+                  value={form.weight || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    update("weight", v === "" ? 0 : Number(v));
+                  }}
                   className={inputClass}
                 />
               </Field>
