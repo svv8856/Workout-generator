@@ -20,6 +20,7 @@ import {
   type CourseDays,
   type CourseWeeks,
   type FullHistoryEntry,
+  exerciseCountRange,
 } from "@/lib/workout";
 
 type Theme = "light" | "dark";
@@ -71,17 +72,12 @@ const labels = {
   place: { home: "Дом", gym: "Зал", outdoor: "Улица" } as const,
 };
 
-// Честный текстовый диапазон количества упражнений в зависимости от выбранной
-// длительности и пола. Учитывает: базовый target из targetForDuration(),
-// итеративную подгонку под окно длительности (±10%) и гарантированное
-// упражнение на тазовое дно для женщин.
+// Текстовый диапазон количества упражнений. Берём из единого источника
+// правды exerciseCountRange() в lib/workout.ts — он же используется как
+// потолок фит-итераций, поэтому подсказка всегда совпадает с реальностью.
 function exerciseRangeFor(duration: number, gender?: "male" | "female"): string {
-  const female = gender === "female" ? 1 : 0;
-  if (duration <= 20) return `${3 + female}–${4 + female}`;
-  if (duration <= 35) return `${4 + female}–${5 + female}`;
-  if (duration <= 60) return `${5 + female}–${7 + female}`;
-  if (duration <= 90) return `${6 + female}–${8 + female}`;
-  return `${8 + female}–${10 + female}`;
+  const { min, max } = exerciseCountRange(duration, gender);
+  return `${min}–${max}`;
 }
 
 function App() {

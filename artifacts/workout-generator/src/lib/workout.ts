@@ -904,6 +904,22 @@ function setsWord(n: number): string {
 
 // Сколько упражнений включать с учётом длительности окна и режима 65+.
 // Чем меньше окно — тем меньше упражнений, чтобы успеть сделать качественно.
+// Единый источник правды по количеству упражнений в тренировке: и UI-подсказка
+// «Подберём N–M упражнений», и потолок фит-итераций пользуются именно им —
+// поэтому реальная тренировка всегда укладывается в обещанный диапазон.
+// Учитывает женское упражнение на тазовое дно (+1).
+export function exerciseCountRange(
+  duration: number,
+  gender?: "male" | "female",
+): { min: number; max: number } {
+  const female = gender === "female" ? 1 : 0;
+  if (duration <= 20) return { min: 3 + female, max: 4 + female };
+  if (duration <= 35) return { min: 4 + female, max: 5 + female };
+  if (duration <= 60) return { min: 5 + female, max: 7 + female };
+  if (duration <= 90) return { min: 6 + female, max: 9 + female };
+  return { min: 8 + female, max: 11 + female };
+}
+
 function targetForDuration(duration: number, seniorMode: boolean): number {
   const r = Math.random() < 0.5;
   if (duration <= 20) return seniorMode ? 3 : r ? 3 : 4;
@@ -1022,6 +1038,11 @@ function fitExercisesToDuration(
       }
       // Все упражнения на потолке — добивка из пула, но только из мышц
       // текущего фокуса (иначе в «Ноги» прилетит упражнение на плечи).
+      // Жёсткий потолок по числу упражнений берём из exerciseCountRange,
+      // чтобы UI-подсказка «Подберём N–M упражнений» всегда совпадала
+      // с реальностью.
+      const maxExercises = exerciseCountRange(f.duration, f.gender).max;
+      if (picked.length >= maxExercises) return;
       const candidate = shuffle(pool).find(
         (e) =>
           !picked.some((p) => p.name === e.name) &&
