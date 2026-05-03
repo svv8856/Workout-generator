@@ -1,0 +1,38 @@
+PS C:\Users\smoru\projects\Workout-generator> pnpm install
+Scope: all 9 workspace projects
+Packages: +1
++
+Progress: resolved 600, reused 593, downloaded 1, added 1, done
+. preinstall$ npx -y only-allow pnpm
+[1 lines collapsed]
+│ npm warn Unknown env config "minimum-release-age". This will stop working in the next major version of npm. See `npm help npmrc` for supported config o…
+│ npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config opti…
+│ npm warn Unknown env config "overrides". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+│ npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported confi…
+│ npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+│ npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported confi…
+│ npm warn Unknown project config "strict-peer-dependencies". This will stop working in the next major version of npm. See `npm help npmrc` for supported…
+│ npm warn Unknown project config "supported-architectures.os". This will stop working in the next major version of npm. See `npm help npmrc` for support…
+│ npm warn Unknown project config "supported-architectures.cpu". This will stop working in the next major version of npm. See `npm help npmrc` for suppor…
+│ npm warn Unknown project config "supported-architectures.libc". This will stop working in the next major version of npm. See `npm help npmrc` for suppo…
+└─ Done in 1.4s
+ WARN  Issues with peer dependencies found
+artifacts/workout-generator
+├─┬ @clerk/react 6.4.2
+│ ├── ✕ unmet peer react@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+│ ├── ✕ unmet peer react-dom@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+│ └─┬ @clerk/shared 4.8.2
+│   ├── ✕ unmet peer react@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+│   └── ✕ unmet peer react-dom@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+└─┬ @clerk/themes 2.4.57
+  └─┬ @clerk/shared 3.47.4
+    ├── ✕ unmet peer react@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+    └── ✕ unmet peer react-dom@"^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0": found 19.1.0
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: @clerk/shared@3.47.4, @clerk/shared@4.8.2.                        │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+Done in 3.9s using pnpm v10.33.2
+PS C:\Users\smoru\projects\Workout-generator>
