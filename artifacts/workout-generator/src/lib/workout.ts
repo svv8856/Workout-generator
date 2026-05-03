@@ -1382,6 +1382,20 @@ export function generateWorkout(f: FormData): WorkoutResult {
     }
   }
 
+  // Для женщин гарантируем 1 упражнение на тазовое дно в каждой
+  // тренировке — добавляем в самом конце как заминку, не вытесняя
+  // основные упражнения. Это короткий блок (1–2 мин), но регулярная
+  // работа с тазовым дном важна для женского здоровья.
+  if (f.gender === "female") {
+    const hasPelvic = picked.some((e) => e.femaleOnly);
+    if (!hasPelvic) {
+      const pelvic = shuffle(pool).find(
+        (e) => e.femaleOnly && !picked.some((p) => p.name === e.name),
+      );
+      if (pelvic) picked.push(pelvic);
+    }
+  }
+
   const exercises: ExerciseOut[] = picked.map((ex) => ({
     name: ex.name,
     sets: setsFor(ex, f.level, f.age),
@@ -1827,6 +1841,17 @@ export function generateCourse(
         Math.min(targetExercises, pool.length),
         s.filler,
       );
+      // Гарантируем 1 упражнение на тазовое дно для женщин в каждой
+      // тренировке курса (см. аналогичную логику в generateWorkout).
+      if (f.gender === "female") {
+        const hasPelvic = picked.some((e) => e.femaleOnly);
+        if (!hasPelvic) {
+          const pelvic = shuffle(pool).find(
+            (e) => e.femaleOnly && !picked.some((p) => p.name === e.name),
+          );
+          if (pelvic) picked.push(pelvic);
+        }
+      }
       const exercises: ExerciseOut[] = picked.map((ex) => ({
         name: ex.name,
         sets: setsForCoursePhase(ex, f.level, f.age, mod.repsMode),
