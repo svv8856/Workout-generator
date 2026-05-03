@@ -1,0 +1,94 @@
+PS C:\Users\smoru> cd C:\Users\smoru\projects\Workout-generator
+PS C:\Users\smoru\projects\Workout-generator> git pull
+remote: Enumerating objects: 58, done.
+remote: Counting objects: 100% (58/58), done.
+remote: Compressing objects: 100% (16/16), done.
+remote: Total 53 (delta 40), reused 50 (delta 37), pack-reused 0 (from 0)
+Unpacking objects: 100% (53/53), 1.57 MiB | 1.46 MiB/s, done.
+From https://github.com/svv8856/Workout-generator
+   0af924f..981333d  main       -> origin/main
+Updating 0af924f..981333d
+error: Your local changes to the following files would be overwritten by merge:
+        artifacts/workout-generator/capacitor.config.ts
+Please commit your changes or stash them before you merge.
+Aborting
+PS C:\Users\smoru\projects\Workout-generator> pnpm install
+Scope: all 9 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ npx -y only-allow pnpm
+[1 lines collapsed]
+│ npm warn Unknown env config "minimum-release-age". This will stop working in the next major version of npm. See `npm help npmrc` for supported config o…
+│ npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config opti…
+│ npm warn Unknown env config "overrides". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+│ npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported confi…
+│ npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+│ npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported confi…
+│ npm warn Unknown project config "strict-peer-dependencies". This will stop working in the next major version of npm. See `npm help npmrc` for supported…
+│ npm warn Unknown project config "supported-architectures.os". This will stop working in the next major version of npm. See `npm help npmrc` for support…
+│ npm warn Unknown project config "supported-architectures.cpu". This will stop working in the next major version of npm. See `npm help npmrc` for suppor…
+│ npm warn Unknown project config "supported-architectures.libc". This will stop working in the next major version of npm. See `npm help npmrc` for suppo…
+└─ Done in 1.4s
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: @clerk/shared@3.47.5, @clerk/shared@4.9.0.                        │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+Done in 2.5s using pnpm v10.33.2
+PS C:\Users\smoru\projects\Workout-generator> pnpm --filter @workspace/workout-generator run build:mobile
+
+> @workspace/workout-generator@0.0.0 build:mobile C:\Users\smoru\projects\Workout-generator\artifacts\workout-generator
+> cross-env BASE_PATH=/ PORT=5173 vite build --config vite.config.ts
+
+vite v7.3.2 building client environment for production...
+✓ 664 modules transformed.
+dist/public/index.html                   0.78 kB │ gzip:   0.46 kB
+dist/public/assets/index-CKN-WQZi.css  110.87 kB │ gzip:  17.35 kB
+dist/public/assets/web-CMj3Yf1-.js       0.90 kB │ gzip:   0.45 kB
+dist/public/assets/web-D1cTy7nZ.js       1.16 kB │ gzip:   0.47 kB
+dist/public/assets/web-reRloe7t.js       3.45 kB │ gzip:   1.11 kB
+dist/public/assets/index-Dpp4rt9J.js   779.92 kB │ gzip: 219.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.45s
+PS C:\Users\smoru\projects\Workout-generator> pnpm --filter @workspace/workout-generator run cap:sync:android
+
+> @workspace/workout-generator@0.0.0 cap:sync:android C:\Users\smoru\projects\Workout-generator\artifacts\workout-generator
+> pnpm run build:mobile && cap sync android
+
+
+> @workspace/workout-generator@0.0.0 build:mobile C:\Users\smoru\projects\Workout-generator\artifacts\workout-generator
+> cross-env BASE_PATH=/ PORT=5173 vite build --config vite.config.ts
+
+vite v7.3.2 building client environment for production...
+✓ 664 modules transformed.
+dist/public/index.html                   0.78 kB │ gzip:   0.46 kB
+dist/public/assets/index-CKN-WQZi.css  110.87 kB │ gzip:  17.35 kB
+dist/public/assets/web-CMj3Yf1-.js       0.90 kB │ gzip:   0.45 kB
+dist/public/assets/web-D1cTy7nZ.js       1.16 kB │ gzip:   0.47 kB
+dist/public/assets/web-reRloe7t.js       3.45 kB │ gzip:   1.11 kB
+dist/public/assets/index-Dpp4rt9J.js   779.92 kB │ gzip: 219.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.29s
+√ Copying web assets from public to android\app\src\main\assets\public in 10.69ms
+√ Creating capacitor.config.json in android\app\src\main\assets in 1.51ms
+√ copy android in 67.02ms
+√ Updating Android plugins in 15.89ms
+[info] Found 6 Capacitor plugins for android:
+       @capacitor-community/keep-awake@8.0.1
+       @capacitor/app@8.1.0
+       @capacitor/haptics@8.0.2
+       @capacitor/local-notifications@8.0.2
+       @capacitor/preferences@8.0.1
+       @capacitor/status-bar@8.0.2
+√ update android in 172.48ms
+[info] Sync finished in 0.32s
+PS C:\Users\smoru\projects\Workout-generator>
