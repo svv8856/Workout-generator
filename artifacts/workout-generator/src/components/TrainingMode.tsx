@@ -66,7 +66,8 @@ export function TrainingMode({
   duration: number;
   onClose: (saved: boolean) => void;
 }) {
-  const restSec = useMemo(
+  // Глобальный отдых (фолбэк, если в схеме упражнения отдыха нет).
+  const fallbackRestSec = useMemo(
     () => parseRestSeconds(result.restBetween),
     [result.restBetween],
   );
@@ -94,6 +95,10 @@ export function TrainingMode({
   const currentState = states[currentIdx];
   const plannedSets = current ? parseSetsCount(current.sets) : 0;
   const workSec = current ? parseWorkSeconds(current.sets) : null;
+  // Отдых читаем из схемы текущего упражнения (например «отдых 60 сек»).
+  const restSec = current
+    ? parseRestSeconds(current.sets) || fallbackRestSec
+    : fallbackRestSec;
 
   // Заводим audio context лениво, при первом тике.
   function beep() {
