@@ -211,6 +211,17 @@ export function TrainingMode({
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
 
+  // Кэшируем голоса — на Android WebView они загружаются асинхронно
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    const load = () => {
+      voicesRef.current = window.speechSynthesis?.getVoices() ?? [];
+    };
+    load();
+    window.speechSynthesis?.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
+  }, []);
+
   const exercises = result.exercises;
   const current = exercises[currentIdx];
   const currentState = states[currentIdx];
@@ -246,12 +257,20 @@ export function TrainingMode({
   function speak(text: string) {
     if (!voiceEnabledRef.current) return;
     try {
-      if (!window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
+      const synth = window.speechSynthesis;
+      if (!synth) return;
       const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = "ru-RU";
+      // Ищем русский голос среди загруженных. Если не нашли — не ставим lang
+      // (Android назначит дефолтный голос устройства, который всё равно озвучит цифры).
+      const ruVoice = voicesRef.current.find((v) => v.lang.startsWith("ru"));
+      if (ruVoice) {
+        utt.voice = ruVoice;
+        utt.lang = ruVoice.lang;
+      }
       utt.rate = 1.1;
-      window.speechSynthesis.speak(utt);
+      // Отменяем только если что-то уже говорит, иначе не трогаем очередь
+      if (synth.speaking) synth.cancel();
+      synth.speak(utt);
     } catch {}
   }
 
