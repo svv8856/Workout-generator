@@ -27,6 +27,10 @@ export interface SessionExerciseLog {
   status: ExerciseStatus;
   // Фактический вес (если пользователь отредактировал) — для прогресса
   weight?: string;
+  // Среднее число повторений в подходе (из «8–10 повторений» → 9). Для тоннажа.
+  reps?: number;
+  // Извлечённый из weight числовой килограммаж (одна нога/одна рука уже учтена).
+  weightKg?: number;
   // Если заменили — на что
   replacedWith?: string;
 }

@@ -91,6 +91,168 @@ function weeklyVolume(sessions: SessionLog[], weeks = 8): WeeklyVolume[] {
   return buckets;
 }
 
+interface WeeklyTonnage {
+  week: string;
+  tonnage: number; // в кг
+}
+
+// Тоннаж = сумма (вес × повторения × выполненные подходы) по упражнениям.
+// Считаем только то, где есть и weightKg, и reps.
+function weeklyTonnage(sessions: SessionLog[], weeks = 8): WeeklyTonnage[] {
+  const today = startOfWeek(new Date());
+  const buckets: WeeklyTonnage[] = [];
+  const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const start = new Date(today);
+    start.setDate(today.getDate() - i * 7);
+    buckets.push({
+      week: `${start.getDate()} ${months[start.getMonth()]}`,
+      tonnage: 0,
+    });
+  }
+  for (const s of sessions) {
+    const w = startOfWeek(new Date(s.ts));
+    const diffWeeks = Math.floor(
+      (today.getTime() - w.getTime()) / (7 * 24 * 3600 * 1000),
+    );
+    if (diffWeeks < 0 || diffWeeks >= weeks) continue;
+    const idx = weeks - 1 - diffWeeks;
+    if (!buckets[idx]) continue;
+    let sessionTonnage = 0;
+    for (const ex of s.exercises) {
+      if (ex.weightKg && ex.reps && ex.doneSets) {
+        sessionTonnage += ex.weightKg * ex.reps * ex.doneSets;
+      }
+    }
+    buckets[idx].tonnage += Math.round(sessionTonnage);
+  }
+  return buckets;
+}
+
+// Базовые упражнения, для которых имеет смысл считать 1RM (формула Эпли).
+// Ключевые слова в названии — простой эвристический фильтр.
+const ONE_RM_KEYWORDS = [
+  "жим",
+  "присед",
+  "становая",
+  "тяга",
+  "подтягив",
+  "выпад",
+  "швунг",
+  "толчок",
+  "рывок",
+];
+
+function isBaseLift(name: string): boolean {
+  const n = name.toLowerCase();
+  return ONE_RM_KEYWORDS.some((k) => n.includes(k));
+}
+
+interface OneRmRow {
+  name: string;
+  current: number;
+  previous: number | null;
+  delta: number | null;
+  lastDate: string;
+}
+
+// Эпли: 1RM ≈ weight × (1 + reps/30). Достоверно только для 1–10 повторений.
+function epley1RM(weight: number, reps: number): number {
+  return weight * (1 + reps / 30);
+}
+
+function oneRmTable(sessions: SessionLog[]): OneRmRow[] {
+  // Собираем по имени упражнения хронологическую серию оценок 1RM.
+  const byEx = new Map<string, { ts: number; date: string; oneRm: number }[]>();
+  for (const s of sessions) {
+    for (const ex of s.exercises) {
+      if (!isBaseLift(ex.name)) continue;
+      if (!ex.weightKg || !ex.reps || ex.doneSets === 0) continue;
+      if (ex.reps > 10) continue; // формула неточна для большого числа повторов
+      const oneRm = epley1RM(ex.weightKg, ex.reps);
+      const arr = byEx.get(ex.name) ?? [];
+      arr.push({ ts: s.ts, date: s.date, oneRm });
+      byEx.set(ex.name, arr);
+    }
+  }
+  const rows: OneRmRow[] = [];
+  for (const [name, points] of byEx) {
+    points.sort((a, b) => a.ts - b.ts);
+    // Берём максимум за каждую тренировку, потом последние 2 как «текущая» и «прошлая».
+    const last = points[points.length - 1]!;
+    const prev = points.length >= 2 ? points[points.length - 2]! : null;
+    rows.push({
+      name,
+      current: Math.round(last.oneRm * 10) / 10,
+      previous: prev ? Math.round(prev.oneRm * 10) / 10 : null,
+      delta:
+        prev !== null
+          ? Math.round((last.oneRm - prev.oneRm) * 10) / 10
+          : null,
+      lastDate: last.date,
+    });
+  }
+  return rows.sort((a, b) => b.current - a.current).slice(0, 5);
+}
+
+// Деload-детектор: за 4 недели RPE растёт, а тоннаж падает.
+function deloadHint(sessions: SessionLog[]): Recommendation | null {
+  const today = startOfWeek(new Date());
+  const weeklyRpe: { sum: number; n: number; tonnage: number }[] = [
+    { sum: 0, n: 0, tonnage: 0 },
+    { sum: 0, n: 0, tonnage: 0 },
+    { sum: 0, n: 0, tonnage: 0 },
+    { sum: 0, n: 0, tonnage: 0 },
+  ];
+  for (const s of sessions) {
+    const w = startOfWeek(new Date(s.ts));
+    const diff = Math.floor(
+      (today.getTime() - w.getTime()) / (7 * 24 * 3600 * 1000),
+    );
+    if (diff < 0 || diff > 3) continue;
+    const idx = 3 - diff; // 0 = 3 нед назад, 3 = текущая
+    const bucket = weeklyRpe[idx]!;
+    if (typeof s.rpe === "number") {
+      bucket.sum += s.rpe;
+      bucket.n += 1;
+    }
+    for (const ex of s.exercises) {
+      if (ex.weightKg && ex.reps && ex.doneSets) {
+        bucket.tonnage += ex.weightKg * ex.reps * ex.doneSets;
+      }
+    }
+  }
+  // Нужно минимум 3 недели подряд с данными
+  const filled = weeklyRpe.filter((w) => w.n > 0 && w.tonnage > 0);
+  if (filled.length < 3) return null;
+  // Сравним последние 2 недели с первыми 2
+  const earlyRpe =
+    (weeklyRpe[0]!.sum + weeklyRpe[1]!.sum) /
+    Math.max(1, weeklyRpe[0]!.n + weeklyRpe[1]!.n);
+  const lateRpe =
+    (weeklyRpe[2]!.sum + weeklyRpe[3]!.sum) /
+    Math.max(1, weeklyRpe[2]!.n + weeklyRpe[3]!.n);
+  const earlyTon = weeklyRpe[0]!.tonnage + weeklyRpe[1]!.tonnage;
+  const lateTon = weeklyRpe[2]!.tonnage + weeklyRpe[3]!.tonnage;
+  if (earlyTon === 0 || earlyRpe === 0) return null;
+  const rpeRise = lateRpe - earlyRpe;
+  const tonDrop = (earlyTon - lateTon) / earlyTon;
+  if (rpeRise >= 0.8 && tonDrop >= 0.15) {
+    return {
+      level: "warn",
+      text: `За последние 2 недели RPE вырос (${earlyRpe.toFixed(1)} → ${lateRpe.toFixed(1)}), а тоннаж упал на ${Math.round(tonDrop * 100)}%. Это классические признаки накопленной усталости — рекомендуем разгрузочную неделю: сократите рабочие веса на 30–40% или количество подходов вдвое.`,
+    };
+  }
+  return null;
+}
+
+function formatTonnage(kg: number): string {
+  if (kg >= 1000) {
+    return `${(kg / 1000).toFixed(1).replace(".", ",")} т`;
+  }
+  return `${kg} кг`;
+}
+
 interface MuscleSlice {
   muscle: string;
   sets: number;
@@ -275,11 +437,24 @@ export function Analytics() {
   useEffect(() => subscribePro(() => setProState(isPro())), []);
 
   const weeks = useMemo(() => weeklyVolume(sessions), [sessions]);
+  const tonnage = useMemo(() => weeklyTonnage(sessions), [sessions]);
+  const tonnageStats = useMemo(() => {
+    const cur = tonnage[tonnage.length - 1]?.tonnage ?? 0;
+    const prev = tonnage[tonnage.length - 2]?.tonnage ?? 0;
+    const deltaKg = cur - prev;
+    const deltaPct = prev > 0 ? Math.round((deltaKg / prev) * 100) : null;
+    return { cur, prev, deltaKg, deltaPct };
+  }, [tonnage]);
   const balance = useMemo(() => muscleBalance(sessions), [sessions]);
   const rpes = useMemo(() => rpeTrend(sessions), [sessions]);
   const times = useMemo(() => timePlanVsActual(sessions), [sessions]);
   const cells = useMemo(() => calendarCells(sessions), [sessions]);
-  const recs = useMemo(() => analyzeForAdaptation(sessions), [sessions]);
+  const oneRm = useMemo(() => oneRmTable(sessions), [sessions]);
+  const recs = useMemo(() => {
+    const base = analyzeForAdaptation(sessions);
+    const deload = deloadHint(sessions);
+    return deload ? [deload, ...base.filter((r) => r.level !== "good")] : base;
+  }, [sessions]);
 
   if (sessions.length === 0) {
     return (
@@ -323,6 +498,129 @@ export function Analytics() {
       <Card title="Активность" subtitle="Последние 7 недель — интенсивность по объёму подходов">
         <CalendarHeatmap cells={cells} />
       </Card>
+
+      {/* Pro: тоннаж по неделям */}
+      <ProCard
+        pro={pro}
+        title="Тоннаж: общий поднятый вес по неделям"
+        subtitle="Сумма (вес × повторения × подходы) — главный показатель объёма силовой работы"
+      >
+        {tonnageStats.cur > 0 || tonnageStats.prev > 0 ? (
+          <div className="space-y-3">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                  За эту неделю
+                </div>
+                <div className="text-3xl font-bold tabular-nums">
+                  {formatTonnage(tonnageStats.cur)}
+                </div>
+              </div>
+              {tonnageStats.prev > 0 && (
+                <div
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold ${
+                    tonnageStats.deltaKg > 0
+                      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40"
+                      : tonnageStats.deltaKg < 0
+                        ? "bg-rose-500/15 text-rose-300 border border-rose-500/40"
+                        : "bg-muted text-muted-foreground border"
+                  }`}
+                >
+                  {tonnageStats.deltaKg > 0 ? "+" : ""}
+                  {formatTonnage(Math.abs(tonnageStats.deltaKg)).replace(
+                    /^/,
+                    tonnageStats.deltaKg < 0 ? "−" : "",
+                  )}
+                  {tonnageStats.deltaPct !== null &&
+                    ` (${tonnageStats.deltaPct > 0 ? "+" : ""}${tonnageStats.deltaPct}%)`}
+                  <span className="ml-1 text-xs opacity-75">vs пред. неделя</span>
+                </div>
+              )}
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={tonnage}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  stroke="hsl(var(--muted-foreground))"
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${v}`
+                  }
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => [formatTonnage(v), "Тоннаж"]}
+                />
+                <Bar dataKey="tonnage" name="Тоннаж" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <Empty>
+            Нужен указанный вес и повторения в упражнениях. Откройте тренировку
+            и впишите рабочий вес — после первой завершённой сессии тоннаж
+            появится здесь.
+          </Empty>
+        )}
+      </ProCard>
+
+      {/* Pro: 1RM по базовым упражнениям */}
+      <ProCard
+        pro={pro}
+        title="Прогноз 1ПМ (одноповторный максимум)"
+        subtitle="Оценка по формуле Эпли для базовых упражнений с 1–10 повторениями"
+      >
+        {oneRm.length > 0 ? (
+          <div className="overflow-x-auto -mx-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+                  <th className="px-2 py-2 font-medium">Упражнение</th>
+                  <th className="px-2 py-2 font-medium text-right">1ПМ</th>
+                  <th className="px-2 py-2 font-medium text-right">Изменение</th>
+                  <th className="px-2 py-2 font-medium text-right">Дата</th>
+                </tr>
+              </thead>
+              <tbody>
+                {oneRm.map((row) => (
+                  <tr key={row.name} className="border-b last:border-0">
+                    <td className="px-2 py-2">{row.name}</td>
+                    <td className="px-2 py-2 text-right font-semibold tabular-nums">
+                      {row.current} кг
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums">
+                      {row.delta === null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : row.delta > 0 ? (
+                        <span className="text-emerald-300">+{row.delta} кг</span>
+                      ) : row.delta < 0 ? (
+                        <span className="text-rose-300">{row.delta} кг</span>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right text-xs text-muted-foreground">
+                      {shortDate(row.lastDate)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty>
+            Нужны базовые упражнения (жимы, приседы, тяги) с указанным весом и
+            1–10 повторениями. После таких тренировок здесь появится оценка
+            одноповторного максимума.
+          </Empty>
+        )}
+      </ProCard>
 
       {/* Pro: баланс мышц */}
       <ProCard pro={pro} title="Баланс мышц за 30 дней">

@@ -21,6 +21,32 @@ function parseWorkSeconds(sets: string): number | null {
   return m ? parseInt(m[1]!, 10) : null;
 }
 
+// Среднее число повторений: «8–10 повторений» → 9, «12 повторений» → 12,
+// «по 30 сек» → null (упражнение на время, считать репсами не имеет смысла).
+function parseRepsAvg(sets: string): number | null {
+  if (/сек/i.test(sets)) return null;
+  const range = sets.match(/(\d+)\s*[–-]\s*(\d+)\s*повтор/);
+  if (range) {
+    return Math.round(
+      (parseInt(range[1]!, 10) + parseInt(range[2]!, 10)) / 2,
+    );
+  }
+  const single = sets.match(/(\d+)\s*повтор/);
+  if (single) return parseInt(single[1]!, 10);
+  return null;
+}
+
+// Достаём первый числовой вес в кг из строки веса. Поддерживает «20 кг»,
+// «штанга 40 кг», «20»; гантели «по 12 кг» считаем как 12 (на одну руку).
+function parseWeightKg(weight?: string): number | null {
+  if (!weight) return null;
+  const m = weight.match(/(\d+(?:[.,]\d+)?)\s*кг/i) || weight.match(/(\d+(?:[.,]\d+)?)/);
+  if (!m) return null;
+  const n = parseFloat(m[1]!.replace(",", "."));
+  if (!isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 // Парсим отдых из строки.
 // Примеры:
 //   «4 подхода по 8–10 повторений · отдых между подходами 60 сек» → 60
@@ -299,6 +325,8 @@ export function TrainingMode({
         doneSets: states[i]!.doneSets,
         status: states[i]!.status,
         weight: ex.weight,
+        reps: parseRepsAvg(ex.sets) ?? undefined,
+        weightKg: parseWeightKg(ex.weight) ?? undefined,
         replacedWith: states[i]!.replacedWith,
       })),
     };
