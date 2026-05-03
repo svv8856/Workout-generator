@@ -13,6 +13,7 @@ import {
   scheduleRestDoneNotification,
   cancelRestNotification,
 } from "@/lib/native";
+import { voicePhrase, voiceLangCode, useLang } from "@/lib/i18n";
 
 // Парсим количество подходов из строки схемы — формат «N подходов … ».
 function parseSetsCount(sets: string): number {
@@ -211,6 +212,13 @@ export function TrainingMode({
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
 
+  // Текущий язык — для голоса и подписей.
+  const lang = useLang();
+  const langRef = useRef(lang);
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
+
   // Кэшируем голоса — на Android WebView они загружаются асинхронно
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   useEffect(() => {
@@ -260,12 +268,18 @@ export function TrainingMode({
       const synth = window.speechSynthesis;
       if (!synth) return;
       const utt = new SpeechSynthesisUtterance(text);
-      // Ищем русский голос среди загруженных. Если не нашли — не ставим lang
-      // (Android назначит дефолтный голос устройства, который всё равно озвучит цифры).
-      const ruVoice = voicesRef.current.find((v) => v.lang.startsWith("ru"));
-      if (ruVoice) {
-        utt.voice = ruVoice;
-        utt.lang = ruVoice.lang;
+      // Ищем голос подходящего языка. Если ru недоступен на устройстве,
+      // пользователь может переключиться на английский — у любого Android
+      // и iOS английский TTS установлен по умолчанию.
+      const wantPrefix = langRef.current === "ru" ? "ru" : "en";
+      const voice =
+        voicesRef.current.find((v) => v.lang.toLowerCase().startsWith(wantPrefix)) ?? null;
+      if (voice) {
+        utt.voice = voice;
+        utt.lang = voice.lang;
+      } else {
+        // Голос не найден — хотя бы lang выставим, чтобы движок выбрал ближайший.
+        utt.lang = voiceLangCode();
       }
       utt.rate = 1.1;
       // Отменяем только если что-то уже говорит, иначе не трогаем очередь
@@ -357,9 +371,9 @@ export function TrainingMode({
 
   // Голосовые подсказки при переключении таймера
   useEffect(() => {
-    if (timerMode === "rest") speak("Отдых");
-    else if (timerMode === "work") speak("Работаем");
-    else if (timerMode === "interExercise") speak("Следующее упражнение");
+    if (timerMode === "rest") speak(voicePhrase("rest"));
+    else if (timerMode === "work") speak(voicePhrase("work"));
+    else if (timerMode === "interExercise") speak(voicePhrase("next"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerMode]);
 

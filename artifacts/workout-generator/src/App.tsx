@@ -39,6 +39,7 @@ import {
   scheduleDailyReminder,
   cancelDailyReminder,
 } from "@/lib/native";
+import { useLang, setLang, t } from "@/lib/i18n";
 
 type Theme = "light" | "dark";
 
@@ -690,7 +691,40 @@ function WelcomeScreen({
 //                          МЕНЮ ПРОФИЛЯ
 // =====================================================================
 
+function LanguageSwitcher() {
+  const lang = useLang();
+  return (
+    <div className="grid grid-cols-2 gap-1 px-1">
+      <button
+        type="button"
+        onClick={() => setLang("ru")}
+        className={`rounded-md px-2 py-1.5 text-sm border transition ${
+          lang === "ru"
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background hover:bg-muted/60"
+        }`}
+      >
+        {t("langRu")}
+      </button>
+      <button
+        type="button"
+        onClick={() => setLang("en")}
+        className={`rounded-md px-2 py-1.5 text-sm border transition ${
+          lang === "en"
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background hover:bg-muted/60"
+        }`}
+      >
+        {t("langEn")}
+      </button>
+    </div>
+  );
+}
+
 function ProfileMenu({ profile }: { profile: Profile }) {
+  // Подписываемся на смену языка, чтобы переключатель и подписи в меню
+  // обновлялись сразу.
+  useLang();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<
     "menu" | "add" | "rename" | "confirm-delete" | "import-result" | "notifications"
@@ -883,13 +917,20 @@ function ProfileMenu({ profile }: { profile: Profile }) {
                 </div>
               )}
 
+              <div className="pt-1 border-t space-y-1">
+                <p className="px-2 pt-1 pb-0.5 text-xs text-muted-foreground">
+                  {t("languageSection")}
+                </p>
+                <LanguageSwitcher />
+              </div>
+
               <div className="pt-1 border-t space-y-0.5">
                 <button
                   type="button"
                   onClick={() => setView("notifications")}
                   className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
                 >
-                  Напоминания о тренировке
+                  {t("remindersMenu")}
                 </button>
                 <button
                   type="button"
