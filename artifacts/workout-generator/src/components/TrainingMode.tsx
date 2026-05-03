@@ -216,20 +216,53 @@ export function TrainingMode({
     ? parseRestSeconds(current.sets) || fallbackRestSec
     : fallbackRestSec;
 
-  // Заводим audio context лениво, при первом тике.
+  // Создаём (или достаём) AudioContext. На iOS Safari он стартует в
+  // состоянии «suspended» и звук не пойдёт, пока не вызвать resume()
+  // строго внутри обработчика пользовательского жеста (тапа).
+  function getAudioCtx(): AudioContext | null {
+    if (typeof window === "undefined") return null;
+    if (!audioCtxRef.current) {
+      type WindowWithWebkit = typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const w = window as WindowWithWebkit;
+      const Ctor = window.AudioContext ?? w.webkitAudioContext;
+      if (!Ctor) return null;
+      try {
+        audioCtxRef.current = new Ctor();
+      } catch {
+        return null;
+      }
+    }
+    return audioCtxRef.current;
+  }
+
+  // «Разблокировка» аудио на мобильных: вызвать в обработчике любого тапа.
+  // Создаёт контекст (если ещё нет), пробуждает его и проигрывает короткий
+  // беззвучный буфер — без этого iOS откажется проигрывать что-либо позже
+  // из таймера (вне жеста).
+  const audioUnlockedRef = useRef(false);
+  function unlockAudio() {
+    if (audioUnlockedRef.current) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      if (ctx.state === "suspended") void ctx.resume();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      audioUnlockedRef.current = true;
+    } catch {}
+  }
+
   function beep() {
     try {
-      if (typeof window === "undefined") return;
-      if (!audioCtxRef.current) {
-        type WindowWithWebkit = typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        };
-        const w = window as WindowWithWebkit;
-        const Ctor = window.AudioContext ?? w.webkitAudioContext;
-        if (!Ctor) return;
-        audioCtxRef.current = new Ctor();
-      }
-      const ctx = audioCtxRef.current;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      // На случай, если контекст снова уснул (iOS усыпляет его при сворачивании).
+      if (ctx.state === "suspended") void ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.frequency.value = 880;
@@ -529,7 +562,10 @@ export function TrainingMode({
 
   return (
     <Overlay>
-      <div className="rounded-2xl border bg-card shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+      <div
+        onPointerDownCapture={unlockAudio}
+        className="rounded-2xl border bg-card shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
+      >
         {/* Шапка */}
         <div className="sticky top-0 bg-card border-b px-4 sm:px-5 py-3 flex items-center gap-3 z-10">
           <div className="flex-1 min-w-0">
