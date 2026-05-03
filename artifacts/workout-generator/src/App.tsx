@@ -32,6 +32,13 @@ import {
 } from "@/lib/sessions";
 import { TrainingMode } from "@/components/TrainingMode";
 import { Analytics } from "@/components/Analytics";
+import { CourseProgress } from "@/components/CourseProgress";
+import {
+  isNative,
+  loadReminderTime,
+  scheduleDailyReminder,
+  cancelDailyReminder,
+} from "@/lib/native";
 
 type Theme = "light" | "dark";
 
@@ -126,7 +133,14 @@ function MainApp({
   const [result, setResult] = useState<ReturnType<typeof generateWorkout> | null>(
     null,
   );
-  const [course, setCourse] = useState<Course | null>(null);
+  const [course, setCourse] = useState<Course | null>(() => {
+    try {
+      const s = window.localStorage.getItem(`wg_course_v1_${getActiveProfile()?.id ?? ""}`);
+      return s ? (JSON.parse(s) as Course) : null;
+    } catch {
+      return null;
+    }
+  });
   const [historyTick, setHistoryTick] = useState(0);
   const [tab, setTab] = useState<"workout" | "analytics">("workout");
   // Активный режим тренировки: показываем оверлей с таймерами и галочками.
@@ -138,13 +152,27 @@ function MainApp({
   // historyTick triggers re-read of history after mutations
   void historyTick;
   useEffect(() => subscribeHistory(() => setHistoryTick((t) => t + 1)), []);
-  // При смене профиля сбрасываем результат и активную тренировку
+  // При смене профиля сбрасываем результат и восстанавливаем курс этого профиля
   useEffect(() => {
     setResult(null);
-    setCourse(null);
+    try {
+      const s = window.localStorage.getItem(`wg_course_v1_${profile.id}`);
+      setCourse(s ? (JSON.parse(s) as Course) : null);
+    } catch {
+      setCourse(null);
+    }
     setTraining(null);
     setTab("workout");
   }, [profile.id]);
+
+  // Сохраняем курс при каждом изменении
+  useEffect(() => {
+    if (course) {
+      window.localStorage.setItem(`wg_course_v1_${profile.id}`, JSON.stringify(course));
+    } else {
+      window.localStorage.removeItem(`wg_course_v1_${profile.id}`);
+    }
+  }, [course, profile.id]);
   const history = getHistorySummary();
   const fullHistory = getFullHistory();
   const recentDays = trainingDaysInLast(7);
@@ -168,7 +196,13 @@ function MainApp({
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
         <header className="mb-8 flex items-start justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/logo.jpg"
+              alt="Логотип"
+              className="w-12 h-12 rounded-xl object-cover shrink-0 shadow"
+            />
+            <div>
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
               Генератор тренировок
             </h1>
@@ -176,6 +210,7 @@ function MainApp({
               Подберём {exerciseRangeFor(form.duration, form.gender)} упражнений под вашу
               цель, уровень и место занятий.
             </p>
+            </div>
           </div>
           <div className="shrink-0 flex items-center gap-2">
             <ProfileMenu profile={profile} />
@@ -550,6 +585,13 @@ function WelcomeScreen({
         </div>
 
         <div className="rounded-2xl border bg-card p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="flex justify-center">
+            <img
+              src="/logo.jpg"
+              alt="Логотип"
+              className="w-24 h-24 rounded-2xl object-cover shadow-md"
+            />
+          </div>
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Добро пожаловать
@@ -632,7 +674,7 @@ function WelcomeScreen({
 function ProfileMenu({ profile }: { profile: Profile }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<
-    "menu" | "add" | "rename" | "confirm-delete" | "import-result"
+    "menu" | "add" | "rename" | "confirm-delete" | "import-result" | "notifications"
   >("menu");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -825,6 +867,13 @@ function ProfileMenu({ profile }: { profile: Profile }) {
               <div className="pt-1 border-t space-y-0.5">
                 <button
                   type="button"
+                  onClick={() => setView("notifications")}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                >
+                  Напоминания о тренировке
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setView("add");
                     setDraft("");
@@ -1010,8 +1059,103 @@ function ProfileMenu({ profile }: { profile: Profile }) {
               </div>
             </div>
           )}
+
+          {view === "notifications" && (
+            <NotificationsView onBack={() => setView("menu")} />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NotificationsView({ onBack }: { onBack: () => void }) {
+  const saved = loadReminderTime();
+  const [enabled, setEnabled] = useState(saved !== null);
+  const [hour, setHour] = useState(saved?.hour ?? 10);
+  const [min, setMin] = useState(saved?.min ?? 0);
+  const [saving, setSaving] = useState(false);
+  const [saved2, setSaved2] = useState(false);
+  const native = isNative();
+
+  const onSave = async () => {
+    setSaving(true);
+    if (enabled) {
+      await scheduleDailyReminder(hour, min);
+    } else {
+      await cancelDailyReminder();
+    }
+    setSaving(false);
+    setSaved2(true);
+    setTimeout(() => setSaved2(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Напоминания
+      </p>
+      {!native && (
+        <p className="text-xs text-muted-foreground rounded-md bg-muted/50 px-3 py-2">
+          Напоминания работают только в мобильном приложении.
+        </p>
+      )}
+      <label className="flex items-center justify-between gap-3 cursor-pointer">
+        <span className="text-sm">Ежедневное напоминание</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={!native}
+          onClick={() => setEnabled((v) => !v)}
+          className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-40 ${enabled ? "bg-primary" : "bg-muted"}`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`}
+          />
+        </button>
+      </label>
+      {enabled && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Время:</span>
+          <input
+            type="number"
+            min={0}
+            max={23}
+            value={hour}
+            onChange={(e) => setHour(Math.max(0, Math.min(23, Number(e.target.value))))}
+            disabled={!native}
+            className="w-14 rounded-md border bg-background px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-40"
+          />
+          <span className="font-semibold">:</span>
+          <input
+            type="number"
+            min={0}
+            max={59}
+            value={min}
+            onChange={(e) => setMin(Math.max(0, Math.min(59, Number(e.target.value))))}
+            disabled={!native}
+            className="w-14 rounded-md border bg-background px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-40"
+          />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex-1 rounded-md border bg-background py-2 text-sm hover:bg-muted/60"
+        >
+          Назад
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!native || saving}
+          className="flex-1 rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? "..." : saved2 ? "Сохранено" : "Сохранить"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1319,6 +1463,8 @@ function CourseView({ course }: { course: Course }) {
           неделю · всего <b>{course.totalSessions}</b> занятий
         </p>
       </div>
+
+      <CourseProgress courseId={course.splitName + "_" + course.weeksCount} />
 
       <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
         {course.generalTips.map((t, i) => (

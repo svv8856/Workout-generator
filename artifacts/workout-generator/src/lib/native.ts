@@ -148,3 +148,65 @@ export async function cancelRestNotification(id: number | null): Promise<void> {
     await LocalNotifications.cancel({ notifications: [{ id }] });
   } catch {}
 }
+
+// ---- Ежедневные напоминания тренироваться ----
+//
+// Пользователь задаёт час и минуту. Мы планируем уведомление на этот момент
+// сегодня (или завтра, если время уже прошло) и повторяем его каждые 24 ч.
+// На вебе функция — no-op; напоминания доступны только в нативном приложении.
+
+const DAILY_REMINDER_ID = 777_000_001;
+const DAILY_REMINDER_KEY = "wg_reminder_v1";
+
+export interface ReminderTime {
+  hour: number;
+  min: number;
+}
+
+export function loadReminderTime(): ReminderTime | null {
+  try {
+    const s = window.localStorage.getItem(DAILY_REMINDER_KEY);
+    if (!s) return null;
+    return JSON.parse(s) as ReminderTime;
+  } catch {
+    return null;
+  }
+}
+
+export function saveReminderTime(t: ReminderTime | null): void {
+  try {
+    if (t) window.localStorage.setItem(DAILY_REMINDER_KEY, JSON.stringify(t));
+    else window.localStorage.removeItem(DAILY_REMINDER_KEY);
+  } catch {}
+}
+
+export async function scheduleDailyReminder(hour: number, min: number): Promise<void> {
+  if (!(await ensureNotificationPermission())) return;
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: DAILY_REMINDER_ID }] });
+    const now = new Date();
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0);
+    if (at <= now) at.setDate(at.getDate() + 1);
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: DAILY_REMINDER_ID,
+          title: "Время тренироваться",
+          body: "Не пропусти тренировку — ты молодец, что держишь режим!",
+          schedule: { at, repeats: true, every: "day" },
+          smallIcon: "ic_stat_icon_config_sample",
+          autoCancel: true,
+        },
+      ],
+    });
+    saveReminderTime({ hour, min });
+  } catch {}
+}
+
+export async function cancelDailyReminder(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: DAILY_REMINDER_ID }] });
+  } catch {}
+  saveReminderTime(null);
+}

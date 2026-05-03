@@ -205,6 +205,11 @@ export function TrainingMode({
 
   const [phase, setPhase] = useState<"training" | "finish">("training");
   const [rpe, setRpe] = useState<number>(7);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const voiceEnabledRef = useRef(true);
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled]);
 
   const exercises = result.exercises;
   const current = exercises[currentIdx];
@@ -235,6 +240,19 @@ export function TrainingMode({
       }
     }
     return audioCtxRef.current;
+  }
+
+  // ---- Голосовой TTS-счётчик ----
+  function speak(text: string) {
+    if (!voiceEnabledRef.current) return;
+    try {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = "ru-RU";
+      utt.rate = 1.1;
+      window.speechSynthesis.speak(utt);
+    } catch {}
   }
 
   // «Разблокировка» аудио на мобильных: вызвать в обработчике любого тапа.
@@ -317,6 +335,21 @@ export function TrainingMode({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerMode]);
+
+  // Голосовые подсказки при переключении таймера
+  useEffect(() => {
+    if (timerMode === "rest") speak("Отдых");
+    else if (timerMode === "work") speak("Работаем");
+    else if (timerMode === "interExercise") speak("Следующее упражнение");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerMode]);
+
+  // Голосовой обратный отсчёт последних 5 секунд
+  useEffect(() => {
+    if (timerMode === null || countdown <= 0 || countdown > 5) return;
+    speak(String(countdown));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
 
   // Удерживаем экран включённым всё время, пока открыт режим тренировки.
   // На вебе — Wake Lock API (Android Chrome), на нативе — Capacitor KeepAwake.
@@ -584,6 +617,15 @@ export function TrainingMode({
               />
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setVoiceEnabled((v) => !v)}
+            className={`rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted/60 transition ${voiceEnabled ? "bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
+            aria-label={voiceEnabled ? "Выключить голос" : "Включить голос"}
+            title={voiceEnabled ? "Голос вкл" : "Голос выкл"}
+          >
+            {voiceEnabled ? "🔊" : "🔇"}
+          </button>
           <button
             type="button"
             onClick={discardAndExit}

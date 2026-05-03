@@ -94,6 +94,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@capacitor/camera": "^8.2.0",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/share": "^8.0.1",
     "@clerk/react": "^6.4.2",
