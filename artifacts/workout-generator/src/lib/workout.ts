@@ -1188,9 +1188,11 @@ export function getHistorySummary(): { lastFocus?: string; lastWhen?: string } {
   return {};
 }
 
-// Классический сплит Push / Pull / Ноги.
-// Бицепс и трицепс строго разделены, чтобы не было трицепса на тягу
-// и бицепса на жим (это нарушает принцип сплита).
+// Классический сплит Push / Pull / Ноги + день «Верх» (силовой акцент).
+// Бицепс и трицепс строго разделены в Push/Pull, чтобы не было трицепса
+// на тягу и бицепса на жим. День «Верх» — отдельный формат: основные
+// мышцы это грудь+спина+плечи, а бицепс/трицепс идут как лёгкая добивка
+// (так же, как в 5-дневном курсе).
 const FOCUS_TEMPLATES: Array<{
   label: string;
   primary: Muscle[];
@@ -1199,6 +1201,7 @@ const FOCUS_TEMPLATES: Array<{
   { label: "Push — грудь, плечи, трицепс", primary: ["chest", "shoulders", "triceps"], filler: ["core"] },
   { label: "Pull — спина, бицепс", primary: ["back", "biceps"], filler: ["core"] },
   { label: "Ноги — квадрицепс, ягодицы", primary: ["legs", "glutes"], filler: ["core"] },
+  { label: "Верх — грудь, спина, плечи", primary: ["chest", "back", "shoulders"], filler: ["biceps", "triceps", "core"] },
 ];
 
 // Сворачиваем подряд идущие записи в окне регенерации в одну (последнюю)
