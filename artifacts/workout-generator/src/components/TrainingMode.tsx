@@ -62,7 +62,7 @@ export function TrainingMode({
   const [states, setStates] = useState<ExerciseState[]>(() =>
     result.exercises.map((ex) => ({
       doneSets: 0,
-      status: parseSetsCount(ex.sets) === 0 ? "skipped" : ("done" as ExerciseStatus),
+      status: "skipped" as ExerciseStatus,
     })),
   );
   // Активный таймер: 'rest' | 'work' | null. countdown = оставшиеся секунды.
