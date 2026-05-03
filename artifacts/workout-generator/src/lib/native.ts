@@ -129,7 +129,7 @@ export async function scheduleRestDoneNotification(secs: number): Promise<number
           id,
           title: "Отдых закончен",
           body: "Время следующего подхода",
-          schedule: { at: new Date(Date.now() + secs * 1000) },
+          schedule: { at: new Date(Date.now() + Math.max(1, secs - 2) * 1000) },
           smallIcon: "ic_stat_icon_config_sample",
           ongoing: false,
           autoCancel: true,
