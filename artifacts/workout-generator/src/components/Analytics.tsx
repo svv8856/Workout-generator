@@ -96,8 +96,34 @@ interface WeeklyTonnage {
   tonnage: number; // в кг
 }
 
+// Парсим вес из строки веса (для совместимости со старыми сессиями,
+// в которых нет числового weightKg). «≈ 17–21 кг на руку» → 21 (берём верх
+// диапазона как реалистичный рабочий вес для подсчёта объёма).
+function fallbackWeightKg(weight?: string): number | null {
+  if (!weight) return null;
+  if (/без\s+вес|свой\s+вес/i.test(weight)) return null;
+  // Сначала ищем диапазон («17–21 кг») — берём верхнюю границу.
+  const range = weight.match(/(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)\s*кг/i);
+  if (range) return parseFloat(range[2]!.replace(",", "."));
+  // Иначе одиночное число с «кг».
+  const single = weight.match(/(\d+(?:[.,]\d+)?)\s*кг/i);
+  if (single) return parseFloat(single[1]!.replace(",", "."));
+  return null;
+}
+
+// Извлекаем рабочий вес и повторения для упражнения с фолбэком на старые
+// сессии: weightKg парсится из строки веса, reps без сохранённого значения
+// принимается за разумный дефолт 10 (середина типичного диапазона 8–12).
+function effectiveLoad(ex: SessionLog["exercises"][number]): {
+  weightKg: number | null;
+  reps: number | null;
+} {
+  const weightKg = ex.weightKg ?? fallbackWeightKg(ex.weight);
+  const reps = ex.reps ?? (weightKg !== null ? 10 : null);
+  return { weightKg, reps };
+}
+
 // Тоннаж = сумма (вес × повторения × выполненные подходы) по упражнениям.
-// Считаем только то, где есть и weightKg, и reps.
 function weeklyTonnage(sessions: SessionLog[], weeks = 8): WeeklyTonnage[] {
   const today = startOfWeek(new Date());
   const buckets: WeeklyTonnage[] = [];
@@ -120,8 +146,10 @@ function weeklyTonnage(sessions: SessionLog[], weeks = 8): WeeklyTonnage[] {
     if (!buckets[idx]) continue;
     let sessionTonnage = 0;
     for (const ex of s.exercises) {
-      if (ex.weightKg && ex.reps && ex.doneSets) {
-        sessionTonnage += ex.weightKg * ex.reps * ex.doneSets;
+      if (!ex.doneSets) continue;
+      const { weightKg, reps } = effectiveLoad(ex);
+      if (weightKg && reps) {
+        sessionTonnage += weightKg * reps * ex.doneSets;
       }
     }
     buckets[idx].tonnage += Math.round(sessionTonnage);
@@ -156,7 +184,7 @@ interface OneRmRow {
   lastDate: string;
 }
 
-// Эпли: 1RM ≈ weight × (1 + reps/30). Достоверно только для 1–10 повторений.
+// Эпли: 1RM ≈ weight × (1 + reps/30). Достоверно для 1–12 повторений.
 function epley1RM(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
@@ -167,9 +195,11 @@ function oneRmTable(sessions: SessionLog[]): OneRmRow[] {
   for (const s of sessions) {
     for (const ex of s.exercises) {
       if (!isBaseLift(ex.name)) continue;
-      if (!ex.weightKg || !ex.reps || ex.doneSets === 0) continue;
-      if (ex.reps > 10) continue; // формула неточна для большого числа повторов
-      const oneRm = epley1RM(ex.weightKg, ex.reps);
+      if (ex.doneSets === 0) continue;
+      const { weightKg, reps } = effectiveLoad(ex);
+      if (!weightKg || !reps) continue;
+      if (reps > 12) continue; // формула неточна для большого числа повторов
+      const oneRm = epley1RM(weightKg, reps);
       const arr = byEx.get(ex.name) ?? [];
       arr.push({ ts: s.ts, date: s.date, oneRm });
       byEx.set(ex.name, arr);
