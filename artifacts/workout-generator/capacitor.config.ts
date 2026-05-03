@@ -14,6 +14,14 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: "#ffffff",
   },
+  ios: {
+    // Цвет фона при загрузке. Совпадает со светлой темой приложения.
+    backgroundColor: "#ffffff",
+    // Запретить тянуть страницу как «упругую» — для приложения, а не сайта,
+    // это выглядит более нативно.
+    scrollEnabled: true,
+    contentInset: "automatic",
+  },
   plugins: {
     LocalNotifications: {
       smallIcon: "ic_stat_icon_config_sample",
