@@ -130,9 +130,14 @@ function MainApp({
   const [mode, setMode] = useState<Mode>("single");
   const [weeksCount, setWeeksCount] = useState<CourseWeeks>(4);
   const [daysPerWeek, setDaysPerWeek] = useState<CourseDays>(3);
-  const [result, setResult] = useState<ReturnType<typeof generateWorkout> | null>(
-    null,
-  );
+  const [result, setResult] = useState<ReturnType<typeof generateWorkout> | null>(() => {
+    try {
+      const s = window.localStorage.getItem(`wg_result_v1_${getActiveProfile()?.id ?? ""}`);
+      return s ? (JSON.parse(s) as ReturnType<typeof generateWorkout>) : null;
+    } catch {
+      return null;
+    }
+  });
   const [course, setCourse] = useState<Course | null>(() => {
     try {
       const s = window.localStorage.getItem(`wg_course_v1_${getActiveProfile()?.id ?? ""}`);
@@ -152,18 +157,32 @@ function MainApp({
   // historyTick triggers re-read of history after mutations
   void historyTick;
   useEffect(() => subscribeHistory(() => setHistoryTick((t) => t + 1)), []);
-  // При смене профиля сбрасываем результат и восстанавливаем курс этого профиля
+  // При смене профиля восстанавливаем результат и курс этого профиля
   useEffect(() => {
-    setResult(null);
     try {
-      const s = window.localStorage.getItem(`wg_course_v1_${profile.id}`);
-      setCourse(s ? (JSON.parse(s) as Course) : null);
+      const sr = window.localStorage.getItem(`wg_result_v1_${profile.id}`);
+      setResult(sr ? (JSON.parse(sr) as ReturnType<typeof generateWorkout>) : null);
+    } catch {
+      setResult(null);
+    }
+    try {
+      const sc = window.localStorage.getItem(`wg_course_v1_${profile.id}`);
+      setCourse(sc ? (JSON.parse(sc) as Course) : null);
     } catch {
       setCourse(null);
     }
     setTraining(null);
     setTab("workout");
   }, [profile.id]);
+
+  // Сохраняем результат при каждом изменении
+  useEffect(() => {
+    if (result) {
+      window.localStorage.setItem(`wg_result_v1_${profile.id}`, JSON.stringify(result));
+    } else {
+      window.localStorage.removeItem(`wg_result_v1_${profile.id}`);
+    }
+  }, [result, profile.id]);
 
   // Сохраняем курс при каждом изменении
   useEffect(() => {
