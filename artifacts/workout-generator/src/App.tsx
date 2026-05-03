@@ -857,12 +857,28 @@ function ResultView({
       <div>
         <h2 className="text-xl font-bold">Ваша тренировка</h2>
         <p className="text-sm text-muted-foreground">
-          {duration} минут · сожжёте ≈{" "}
+          Цель {duration} мин · реально ~
+          <span className="font-semibold text-foreground">
+            {result.estimatedMinutes}
+          </span>{" "}
+          мин · сожжёте ≈{" "}
           <span className="font-semibold text-foreground">
             {result.calories}
           </span>{" "}
           ккал
         </p>
+        {result.estimatedMinutes > duration * 1.15 && (
+          <p className="text-xs text-amber-400 mt-1">
+            Тренировка займёт больше выбранного окна. Сократите количество
+            подходов или увеличьте длительность в форме.
+          </p>
+        )}
+        {result.estimatedMinutes < duration * 0.7 && (
+          <p className="text-xs text-sky-400 mt-1">
+            Можно добавить ещё одно упражнение или увеличить количество
+            подходов — окно позволяет.
+          </p>
+        )}
       </div>
       {result.warnings.length > 0 && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">

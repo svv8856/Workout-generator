@@ -889,6 +889,91 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// =====================================================================
+//                  ПОДСТРОЙКА ПОД ВЫБРАННУЮ ДЛИТЕЛЬНОСТЬ
+// =====================================================================
+
+// Русское склонение слова «подход» по числу (1 подход, 2 подхода, 5 подходов)
+function setsWord(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "подход";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "подхода";
+  return "подходов";
+}
+
+// Сколько упражнений включать с учётом длительности окна и режима 65+.
+// Чем меньше окно — тем меньше упражнений, чтобы успеть сделать качественно.
+function targetForDuration(duration: number, seniorMode: boolean): number {
+  const r = Math.random() < 0.5;
+  if (duration <= 20) return seniorMode ? 3 : r ? 3 : 4;
+  if (duration <= 35) return seniorMode ? 4 : r ? 4 : 5;
+  if (duration <= 60) return seniorMode ? (r ? 4 : 5) : r ? 5 : 6;
+  if (duration <= 90) return seniorMode ? (r ? 5 : 6) : r ? 6 : 7;
+  return seniorMode ? 7 : 8;
+}
+
+// Корректировка количества подходов в строке схемы под окно длительности.
+// ≤20 мин → 2 подхода, 21–35 → 3 подхода, 36–90 → как у уровня, >90 → +1.
+function adjustSetsForDuration(sets: string, duration: number): string {
+  let newCount: number | null = null;
+  if (duration <= 20) newCount = 2;
+  else if (duration <= 35) newCount = 3;
+  else if (duration > 90) {
+    const m = sets.match(/^(\d+)\s+подход/);
+    if (m) newCount = parseInt(m[1]!, 10) + 1;
+  }
+  if (newCount === null) return sets;
+  return sets.replace(
+    /^\d+\s+подход(?:ов|а)?/,
+    `${newCount} ${setsWord(newCount)}`,
+  );
+}
+
+// Оценка времени одного упражнения в секундах: подходы × (работа + отдых)
+// + переход к следующему упражнению.
+// Парсим строку схемы вида «N подходов по X–Y повторений · отдых Z сек»
+// или «N подходов по K сек · отдых Z сек».
+function estimateExerciseSeconds(sets: string): number {
+  const setsMatch = sets.match(/(\d+)\s+подход/);
+  const setsN = setsMatch ? parseInt(setsMatch[1]!, 10) : 3;
+  const restMatch = sets.match(/отдых[^0-9]*(\d+)\s*сек/);
+  const restSec = restMatch ? parseInt(restMatch[1]!, 10) : 60;
+
+  let workSec = 30;
+  // Кардио/изометрия: «по X сек»
+  const secMatch = sets.match(/по\s+(\d+)\s*сек/);
+  if (secMatch) {
+    workSec = parseInt(secMatch[1]!, 10);
+  } else {
+    // Силовая: «по X–Y повторений» (берём верхнюю границу × 3 сек/повтор)
+    const rangeMatch = sets.match(/по\s+\d+[–-](\d+)\s*повторен/);
+    if (rangeMatch) workSec = parseInt(rangeMatch[1]!, 10) * 3;
+    else {
+      const single = sets.match(/по\s+(\d+)\s*повторен/);
+      if (single) workSec = parseInt(single[1]!, 10) * 3;
+    }
+  }
+
+  return setsN * workSec + (setsN - 1) * restSec;
+}
+
+// Суммарное время тренировки: разминка + упражнения + переходы между ними.
+function estimateWorkoutMinutes(exercises: ExerciseOut[]): number {
+  const WARMUP_SEC = 300; // 5 мин разминка/мобилизация
+  const TRANSITION_SEC = 45; // переход к новому снаряду / снимаем-ставим
+  const total =
+    WARMUP_SEC +
+    exercises.reduce(
+      (acc, ex, i) =>
+        acc +
+        estimateExerciseSeconds(ex.sets) +
+        (i > 0 ? TRANSITION_SEC : 0),
+      0,
+    );
+  return Math.round(total / 60);
+}
+
 // Сбалансированный отбор: стараемся охватить разные группы мышц
 function pickBalanced(pool: Exercise[], goal: Goal, target: number): Exercise[] {
   // Желаемое распределение по типам в зависимости от цели
@@ -954,6 +1039,9 @@ export interface WorkoutResult {
   restBetween: string;
   focusLabel?: string;
   focusNote?: string;
+  // Реальная оценка времени (мин): разминка + упражнения + переходы.
+  // Сравнивается с f.duration в UI, чтобы пользователь видел расхождение.
+  estimatedMinutes: number;
 }
 
 // =====================================================================
@@ -1283,10 +1371,9 @@ export function generateWorkout(f: FormData): WorkoutResult {
     return true;
   });
 
-  // Целевое количество упражнений: 5–6, для 65+ снижаем до 4–5
-  const target = seniorMode
-    ? Math.random() < 0.5 ? 4 : 5
-    : Math.random() < 0.5 ? 5 : 6;
+  // Целевое количество упражнений зависит от выбранного окна длительности
+  // и режима 65+. Реальное время потом ещё раз проверится оценкой.
+  const target = targetForDuration(f.duration, seniorMode);
 
   // ---- ВЫБОР ФОКУСА С УЧЁТОМ ИСТОРИИ ----
   // Каждая тренировка — конкретный сплит (жим / тяга / ноги).
@@ -1398,7 +1485,7 @@ export function generateWorkout(f: FormData): WorkoutResult {
 
   const exercises: ExerciseOut[] = picked.map((ex) => ({
     name: ex.name,
-    sets: setsFor(ex, f.level, f.age),
+    sets: adjustSetsForDuration(setsFor(ex, f.level, f.age), f.duration),
     muscle: muscleLabel[ex.muscle],
     weight: recommendWeight(ex, f),
     cue: cueFor(ex.name),
@@ -1536,6 +1623,9 @@ export function generateWorkout(f: FormData): WorkoutResult {
   const sessionMuscles = Array.from(new Set(picked.map((e) => e.muscle)));
   saveHistoryEntry(sessionMuscles, focusLabel);
 
+  // Реальная оценка времени тренировки — для сравнения с f.duration в UI
+  const estimatedMinutes = estimateWorkoutMinutes(exercises);
+
   return {
     exercises,
     calories,
@@ -1545,6 +1635,7 @@ export function generateWorkout(f: FormData): WorkoutResult {
     restBetween,
     focusLabel,
     focusNote,
+    estimatedMinutes,
   };
 }
 
@@ -1829,7 +1920,13 @@ export function generateCourse(
 
   const split = SPLITS[daysPerWeek];
   const weekdays = WEEKDAYS_BY_COUNT[daysPerWeek];
-  const targetExercises = seniorMode ? 4 : daysPerWeek >= 4 ? 5 : 6;
+  // В курсе тоже учитываем выбранную длительность тренировки.
+  // При большом числе дней в неделю (4–5) обычно делают чуть меньше
+  // упражнений за день, поэтому ограничиваем верхнюю границу.
+  const targetExercises = Math.min(
+    targetForDuration(f.duration, seniorMode),
+    daysPerWeek >= 4 ? 6 : 8,
+  );
 
   const weeks: WeekPlan[] = [];
   for (let w = 0; w < weeksCount; w++) {
@@ -1854,7 +1951,10 @@ export function generateCourse(
       }
       const exercises: ExerciseOut[] = picked.map((ex) => ({
         name: ex.name,
-        sets: setsForCoursePhase(ex, f.level, f.age, mod.repsMode),
+        sets: adjustSetsForDuration(
+          setsForCoursePhase(ex, f.level, f.age, mod.repsMode),
+          f.duration,
+        ),
         muscle: muscleLabel[ex.muscle],
         weight: recommendWeight(ex, f, mod.loadScale),
         cue: cueFor(ex.name),
