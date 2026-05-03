@@ -946,16 +946,122 @@ function estimateExerciseSeconds(sets: string): number {
   if (secMatch) {
     workSec = parseInt(secMatch[1]!, 10);
   } else {
-    // Силовая: «по X–Y повторений» (берём верхнюю границу × 3 сек/повтор)
+    // Силовая: «по X–Y повторений» (верхняя граница × 3.5 сек/повтор —
+    // включая концентрику, эксцентрику, паузы и установку положения).
     const rangeMatch = sets.match(/по\s+\d+[–-](\d+)\s*повторен/);
-    if (rangeMatch) workSec = parseInt(rangeMatch[1]!, 10) * 3;
+    if (rangeMatch) workSec = Math.round(parseInt(rangeMatch[1]!, 10) * 3.5);
     else {
       const single = sets.match(/по\s+(\d+)\s*повторен/);
-      if (single) workSec = parseInt(single[1]!, 10) * 3;
+      if (single) workSec = Math.round(parseInt(single[1]!, 10) * 3.5);
     }
   }
 
   return setsN * workSec + (setsN - 1) * restSec;
+}
+
+// Извлечь текущее количество подходов из строки схемы.
+function getSetsCount(sets: string): number {
+  const m = sets.match(/^(\d+)\s+подход/);
+  return m ? parseInt(m[1]!, 10) : 3;
+}
+
+// Заменить ведущее число «N подходов» в строке на новое значение
+// (с правильным русским склонением).
+function setSetsCount(sets: string, n: number): string {
+  return sets.replace(
+    /^\d+\s+подход(?:ов|а)?/,
+    `${n} ${setsWord(n)}`,
+  );
+}
+
+// Итеративная подгонка тренировки под выбранную длительность.
+// Цель — попасть в окно ±10% от f.duration. Если время меньше:
+// добавляем подход к упражнению с минимальным числом подходов
+// (до потолка MAX_SETS), а если все упражнения уже на потолке —
+// добавляем ещё одно упражнение из пула. Если время больше:
+// убираем подход с самого «нагруженного», а если нельзя — убираем
+// последнее упражнение (но не меньше пола в 3 упражнения).
+function fitExercisesToDuration(
+  picked: Exercise[],
+  exercises: ExerciseOut[],
+  pool: Exercise[],
+  f: FormData,
+): void {
+  const MAX_SETS = 6;
+  const MIN_SETS = 2;
+  const MIN_EXERCISES = 3;
+  const MAX_ITER = 80;
+  const lo = f.duration * 0.9;
+  const hi = f.duration * 1.1;
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const est = estimateWorkoutMinutes(exercises);
+    if (est >= lo && est <= hi) return;
+
+    if (est < lo) {
+      // Не хватает времени — добавляем подход к самому «лёгкому».
+      // Кардио/изометрия пропускаются, чтобы не разрастались до 6×60 сек.
+      let bestIdx = -1;
+      let lowest = Infinity;
+      for (let j = 0; j < exercises.length; j++) {
+        const ex = picked[j]!;
+        if (ex.cardio) continue;
+        const c = getSetsCount(exercises[j]!.sets);
+        if (c < MAX_SETS && c < lowest) {
+          lowest = c;
+          bestIdx = j;
+        }
+      }
+      if (bestIdx >= 0) {
+        exercises[bestIdx]!.sets = setSetsCount(
+          exercises[bestIdx]!.sets,
+          lowest + 1,
+        );
+        continue;
+      }
+      // Все упражнения на потолке — добивка из пула.
+      const candidate = shuffle(pool).find(
+        (e) => !picked.some((p) => p.name === e.name),
+      );
+      if (!candidate) return; // пул исчерпан
+      picked.push(candidate);
+      exercises.push({
+        name: candidate.name,
+        sets: adjustSetsForDuration(
+          setsFor(candidate, f.level, f.age),
+          f.duration,
+        ),
+        muscle: muscleLabel[candidate.muscle],
+        weight: recommendWeight(candidate, f),
+        cue: cueFor(candidate.name),
+        videoYoutube: videoUrlFor(candidate.name, "youtube"),
+        videoRutube: videoUrlFor(candidate.name, "rutube"),
+      });
+    } else {
+      // Времени слишком много — убираем подход у самого «тяжёлого».
+      let bestIdx = -1;
+      let highest = -Infinity;
+      for (let j = 0; j < exercises.length; j++) {
+        const c = getSetsCount(exercises[j]!.sets);
+        if (c > MIN_SETS && c > highest) {
+          highest = c;
+          bestIdx = j;
+        }
+      }
+      if (bestIdx >= 0) {
+        exercises[bestIdx]!.sets = setSetsCount(
+          exercises[bestIdx]!.sets,
+          highest - 1,
+        );
+        continue;
+      }
+      // Дальше уменьшать подходы нельзя — выкидываем последнее упражнение.
+      if (exercises.length > MIN_EXERCISES) {
+        exercises.pop();
+        picked.pop();
+      } else return;
+    }
+  }
 }
 
 // Суммарное время тренировки: разминка + упражнения + переходы между ними.
@@ -1622,6 +1728,10 @@ export function generateWorkout(f: FormData): WorkoutResult {
   // Сохраняем сессию в историю (для следующего раза)
   const sessionMuscles = Array.from(new Set(picked.map((e) => e.muscle)));
   saveHistoryEntry(sessionMuscles, focusLabel);
+
+  // Итеративно подгоняем тренировку под выбранное окно длительности:
+  // докидываем подходы / упражнения если коротко, или убираем если длинно.
+  fitExercisesToDuration(picked, exercises, pool, f);
 
   // Реальная оценка времени тренировки — для сравнения с f.duration в UI
   const estimatedMinutes = estimateWorkoutMinutes(exercises);
