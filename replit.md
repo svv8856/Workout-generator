@@ -41,3 +41,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
   - Designed so it can later be wrapped (e.g., Capacitor) into a mobile app for the App Store / Google Play with no server dependency.
 - **Exercise database**: ~190 exercises in `src/lib/workout.ts`, organised by equipment × muscle. Strict separation of `biceps` / `triceps` (no generic "arms").
 - **Focus methodology**: Push (chest/shoulders/triceps), Pull (back/biceps), Legs (legs/glutes). `pickForSession` only ever picks exercises whose muscle is in the day's `primary` or `filler` lists; missing groups make the session shorter rather than mixing groups across days. Focus label is rebuilt from the muscles actually selected.
+- **Pro feature set** (free at launch via toggle in `Analytics`):
+  - `src/lib/sessions.ts`: `SessionLog`/`SessionExerciseLog` per-profile in `wg_sessions_v1:<id>` (cap 200), global `wg_pro_v1` flag. APIs: `saveSession`, `listSessions`, `deleteSession`, `clearSessions`, `subscribeSessions`, `isPro`, `setPro`, `subscribePro`.
+  - `src/components/TrainingMode.tsx`: full-screen overlay (`role="dialog"`) with progress, set checkmarks, work/rest timers (WebAudio beep), Готово/Пропустить/Закончить раньше, final RPE 1–10. Launched from green "▶ Тренируюсь сейчас" on the workout result card.
+  - `src/components/Analytics.tsx`: tab in `MainApp`. Free: weekly volume bar + calendar heatmap. Pro: muscle-balance pie, RPE trend, plan-vs-actual, `analyzeForAdaptation` recommendations. Pro cards blurred with CTA when off.

@@ -20,8 +20,11 @@ import {
   type CourseDays,
   type CourseWeeks,
   type FullHistoryEntry,
+  type WorkoutResult,
   exerciseCountRange,
 } from "@/lib/workout";
+import { TrainingMode } from "@/components/TrainingMode";
+import { Analytics } from "@/components/Analytics";
 
 type Theme = "light" | "dark";
 
@@ -118,13 +121,21 @@ function MainApp({
   );
   const [course, setCourse] = useState<Course | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
+  const [tab, setTab] = useState<"workout" | "analytics">("workout");
+  // Активный режим тренировки: показываем оверлей с таймерами и галочками.
+  const [training, setTraining] = useState<{
+    result: WorkoutResult;
+    duration: number;
+  } | null>(null);
   // historyTick triggers re-read of history after mutations
   void historyTick;
   useEffect(() => subscribeHistory(() => setHistoryTick((t) => t + 1)), []);
-  // При смене профиля сбрасываем результат предыдущего пользователя
+  // При смене профиля сбрасываем результат и активную тренировку
   useEffect(() => {
     setResult(null);
     setCourse(null);
+    setTraining(null);
+    setTab("workout");
   }, [profile.id]);
   const history = getHistorySummary();
   const fullHistory = getFullHistory();
@@ -176,6 +187,36 @@ function MainApp({
           </div>
         </header>
 
+        {/* Вкладки: тренировка и аналитика */}
+        <div className="mb-6 inline-flex rounded-lg border bg-card p-1 text-sm">
+          <button
+            type="button"
+            onClick={() => setTab("workout")}
+            className={`px-3 sm:px-4 py-1.5 rounded-md font-medium transition ${
+              tab === "workout"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Тренировка
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("analytics")}
+            className={`px-3 sm:px-4 py-1.5 rounded-md font-medium transition ${
+              tab === "analytics"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Аналитика
+          </button>
+        </div>
+
+        {tab === "analytics" ? (
+          <Analytics />
+        ) : (
+        <>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
           <form
             onSubmit={onSubmit}
@@ -399,8 +440,17 @@ function MainApp({
           </form>
 
           {result ? (
-            <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
+            <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm space-y-4">
               <ResultView result={result} duration={form.duration} />
+              <button
+                type="button"
+                onClick={() =>
+                  setTraining({ result, duration: form.duration })
+                }
+                className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-3 text-sm font-semibold text-white transition"
+              >
+                ▶ Тренируюсь сейчас
+              </button>
             </div>
           ) : course ? (
             <div className="rounded-xl border bg-card p-4 sm:p-6 shadow-sm">
@@ -426,12 +476,25 @@ function MainApp({
             />
           </div>
         )}
+        </>
+        )}
 
         <footer className="mt-10 text-center text-xs text-muted-foreground">
           Это базовые рекомендации. При проблемах со здоровьем
           проконсультируйтесь с врачом.
         </footer>
       </div>
+
+      {training && (
+        <TrainingMode
+          result={training.result}
+          duration={training.duration}
+          onClose={(saved) => {
+            setTraining(null);
+            if (saved) setTab("analytics");
+          }}
+        />
+      )}
     </div>
   );
 }
