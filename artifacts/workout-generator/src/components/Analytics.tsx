@@ -364,6 +364,18 @@ function calendarCells(sessions: SessionLog[], days = 49): CalendarCell[] {
   return cells;
 }
 
+// Сколько дней прошло с самой первой тренировки (включительно). Используется,
+// чтобы развернуть «всю историю» в календаре.
+function daysSinceFirstSession(sessions: SessionLog[]): number {
+  if (sessions.length === 0) return 0;
+  const first = sessions.reduce((m, s) => Math.min(m, s.ts), sessions[0]!.ts);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const firstDay = new Date(first);
+  firstDay.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - firstDay.getTime()) / (24 * 3600 * 1000)) + 1;
+}
+
 function shortDate(ymdStr: string): string {
   const d = ymdToDate(ymdStr);
   return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -561,7 +573,18 @@ export function Analytics() {
   const balance = useMemo(() => muscleBalance(sessions), [sessions]);
   const rpes = useMemo(() => rpeTrend(sessions), [sessions]);
   const times = useMemo(() => timePlanVsActual(sessions), [sessions]);
-  const cells = useMemo(() => calendarCells(sessions), [sessions]);
+  const [calendarFull, setCalendarFull] = useState(false);
+  const calendarDays = useMemo(
+    () =>
+      calendarFull
+        ? Math.max(49, daysSinceFirstSession(sessions))
+        : 49,
+    [calendarFull, sessions],
+  );
+  const cells = useMemo(
+    () => calendarCells(sessions, calendarDays),
+    [sessions, calendarDays],
+  );
   const oneRm = useMemo(() => oneRmTable(sessions), [sessions]);
   const recs = useMemo(() => {
     const base = analyzeForAdaptation(sessions);
@@ -608,8 +631,26 @@ export function Analytics() {
       </Card>
 
       {/* Бесплатно: календарь активности */}
-      <Card title="Активность" subtitle="Последние 7 недель — интенсивность по объёму подходов">
+      <Card
+        title="Активность"
+        subtitle={
+          calendarFull
+            ? `Вся история — ${sessions.length} тренировок с ${shortDate(
+                cells[0]!.date,
+              )}`
+            : "Последние 7 недель — интенсивность по объёму подходов"
+        }
+      >
         <CalendarHeatmap cells={cells} />
+        {sessions.length > 0 && daysSinceFirstSession(sessions) > 49 && (
+          <button
+            type="button"
+            onClick={() => setCalendarFull((v) => !v)}
+            className="mt-3 text-xs text-primary hover:underline"
+          >
+            {calendarFull ? "Свернуть до 7 недель" : "Показать всю историю"}
+          </button>
+        )}
       </Card>
 
       {/* Pro: тоннаж по неделям */}
@@ -969,13 +1010,10 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 function CalendarHeatmap({ cells }: { cells: CalendarCell[] }) {
-  // 7 строк × N столбцов; ставим понедельник вверху
-  const rows: CalendarCell[][] = [[], [], [], [], [], [], []];
-  for (const c of cells) {
-    const d = ymdToDate(c.date);
-    const row = (d.getDay() + 6) % 7; // 0=пн
-    rows[row]!.push(c);
-  }
+  // Раскладываем в колонки по неделям (как у GitHub): каждая колонка =
+  // одна неделя, 7 строк = понедельник…воскресенье.
+  // Если в первой неделе не хватает дней (история начинается со среды) —
+  // первые ячейки пустые.
   const colorFor = (level: number): string => {
     if (level === 0) return "bg-muted/30 border-border";
     if (level === 1) return "bg-emerald-500/20 border-emerald-500/40";
@@ -983,25 +1021,124 @@ function CalendarHeatmap({ cells }: { cells: CalendarCell[] }) {
     if (level === 3) return "bg-emerald-500/60 border-emerald-500/70";
     return "bg-emerald-500/80 border-emerald-500";
   };
-  const labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const dayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const months = [
+    "янв",
+    "фев",
+    "мар",
+    "апр",
+    "мая",
+    "июн",
+    "июл",
+    "авг",
+    "сен",
+    "окт",
+    "ноя",
+    "дек",
+  ];
+
+  if (cells.length === 0) return null;
+
+  // Строим колонки. Каждая колонка — массив из 7 опциональных ячеек.
+  const columns: (CalendarCell | null)[][] = [];
+  let current: (CalendarCell | null)[] = Array(7).fill(null);
+  let lastWeekIdx = -1;
+  for (const c of cells) {
+    const d = ymdToDate(c.date);
+    const dow = (d.getDay() + 6) % 7; // 0 = пн
+    // Считаем «индекс недели» относительно понедельника эпохи — для группировки
+    const weekIdx = Math.floor(
+      (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
+        Date.UTC(2020, 0, 6)) /
+        (7 * 24 * 3600 * 1000),
+    );
+    if (lastWeekIdx === -1) lastWeekIdx = weekIdx;
+    if (weekIdx !== lastWeekIdx) {
+      columns.push(current);
+      current = Array(7).fill(null);
+      lastWeekIdx = weekIdx;
+    }
+    current[dow] = c;
+  }
+  columns.push(current);
+
+  // Подписи месяцев: показываем там, где в колонке появляется новый месяц
+  // (на любой ненулевой ячейке).
+  const monthLabels: (string | null)[] = columns.map((col) => {
+    const firstCell = col.find((c): c is CalendarCell => c !== null);
+    if (!firstCell) return null;
+    const d = ymdToDate(firstCell.date);
+    return d.getDate() <= 7 ? months[d.getMonth()]! : null;
+  });
+  // Подписи года — где меняется год
+  let lastYear = -1;
+  const yearLabels: (string | null)[] = columns.map((col) => {
+    const firstCell = col.find((c): c is CalendarCell => c !== null);
+    if (!firstCell) return null;
+    const y = ymdToDate(firstCell.date).getFullYear();
+    if (y !== lastYear) {
+      lastYear = y;
+      return String(y);
+    }
+    return null;
+  });
+
   return (
-    <div className="space-y-1">
-      {rows.map((row, ri) => (
-        <div key={ri} className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground w-5 shrink-0">
-            {labels[ri]}
-          </span>
-          <div className="flex gap-1 flex-wrap">
-            {row.map((c) => (
-              <div
-                key={c.date}
-                title={`${c.date}: ${c.sets} подх.`}
-                className={`h-3.5 w-3.5 rounded-sm border ${colorFor(c.level)}`}
-              />
+    <div className="space-y-1 overflow-x-auto">
+      <div className="inline-block min-w-full">
+        {/* Год */}
+        <div className="flex gap-[3px] pl-7 mb-1">
+          {yearLabels.map((y, i) => (
+            <div
+              key={`y-${i}`}
+              className="w-[14px] text-[10px] text-muted-foreground font-medium"
+            >
+              {y ?? ""}
+            </div>
+          ))}
+        </div>
+        {/* Месяц */}
+        <div className="flex gap-[3px] pl-7 mb-1">
+          {monthLabels.map((m, i) => (
+            <div
+              key={`m-${i}`}
+              className="w-[14px] text-[10px] text-muted-foreground"
+            >
+              {m ?? ""}
+            </div>
+          ))}
+        </div>
+        {/* Сетка: дни недели слева + колонки */}
+        <div className="flex gap-1.5">
+          <div className="flex flex-col gap-[3px] w-5 shrink-0">
+            {dayLabels.map((l, i) => (
+              <span
+                key={i}
+                className="text-[10px] text-muted-foreground h-3.5 leading-3.5"
+              >
+                {i % 2 === 0 ? l : ""}
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-[3px]">
+            {columns.map((col, ci) => (
+              <div key={ci} className="flex flex-col gap-[3px]">
+                {col.map((c, ri) =>
+                  c ? (
+                    <div
+                      key={c.date}
+                      title={`${c.date}: ${c.sets} подх.`}
+                      className={`h-3.5 w-3.5 rounded-sm border ${colorFor(c.level)}`}
+                    />
+                  ) : (
+                    <div key={ri} className="h-3.5 w-3.5" />
+                  ),
+                )}
+              </div>
             ))}
           </div>
         </div>
-      ))}
+      </div>
       <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <span>меньше</span>
         {[0, 1, 2, 3, 4].map((l) => (

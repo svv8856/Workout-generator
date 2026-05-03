@@ -15,7 +15,9 @@ import type { Muscle } from "./workout";
 
 const SESSIONS_KEY_BASE = "wg_sessions_v1";
 const PRO_KEY = "wg_pro_v1";
-const MAX_SESSIONS = 200; // потолок на профиль — годами хватит
+// Потолок на профиль. ~1 КБ на сессию, 5000 сессий ≈ 5 МБ — впритык к лимиту
+// localStorage, но с запасом на ~10+ лет тренировок при 3–4 в неделю.
+const MAX_SESSIONS = 5000;
 
 export type ExerciseStatus = "done" | "partial" | "skipped" | "replaced";
 
