@@ -58,22 +58,29 @@ function parseRestSeconds(text: string): number {
   const restPart = text.match(/отдых[^\d]*(\d[^·\n]*)/i);
   const target = restPart ? restPart[1]! : text;
   // 2) В этом фрагменте берём диапазон или одиночное число (с десятичной).
+  //    Запоминаем позицию совпадения, чтобы корректно прочитать единицу
+  //    сразу после числа (а не из любого «мин» в скобках).
   const range = target.match(
     /(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)/,
   );
   let avg: number;
+  let matchEnd: number;
   if (range) {
     const a = parseFloat(range[1]!.replace(",", "."));
     const b = parseFloat(range[2]!.replace(",", "."));
     avg = (a + b) / 2;
+    matchEnd = (range.index ?? 0) + range[0]!.length;
   } else {
     const single = target.match(/(\d+(?:[.,]\d+)?)/);
     if (!single) return 75;
     avg = parseFloat(single[1]!.replace(",", "."));
+    matchEnd = (single.index ?? 0) + single[0]!.length;
   }
-  // 3) Единицы определяем по фрагменту, иначе по всей строке.
-  const unitText = restPart ? target : text;
-  const isMinutes = /мин/i.test(unitText);
+  // 3) Единицу читаем из «хвоста» — первых ~10 символов сразу после числа,
+  //    до запятой/скобки/точки/середины предложения. Это спасает от случаев
+  //    типа «60–90 секунд (можно до 2–3 мин ...)» — здесь хвост = «секунд».
+  const tail = target.slice(matchEnd, matchEnd + 12).split(/[(,.·]|\sили\s/)[0] ?? "";
+  const isMinutes = /мин/i.test(tail);
   const sec = Math.round(avg * (isMinutes ? 60 : 1));
   return Math.max(10, Math.min(300, sec));
 }
