@@ -159,3 +159,87 @@ export function clearSessions(): void {
 export function newSessionId(): string {
   return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
+
+// ---- Экспорт / импорт истории ----
+//
+// Формат бэкапа — простой JSON с маркером и версией. Это страховка от потери
+// данных (localStorage чистится по любому чиху браузера) и одновременно мост
+// для переезда в будущее мобильное приложение: оно сможет импортировать
+// файл в нативное хранилище.
+
+export const BACKUP_FORMAT = "wg-backup";
+export const BACKUP_VERSION = 1;
+
+export interface BackupFile {
+  format: typeof BACKUP_FORMAT;
+  version: number;
+  exportedAt: string; // ISO
+  profileName: string;
+  sessionCount: number;
+  sessions: SessionLog[];
+}
+
+export function buildBackup(profileName: string): BackupFile {
+  const sessions = listSessions();
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    profileName,
+    sessionCount: sessions.length,
+    sessions,
+  };
+}
+
+export interface ImportResult {
+  added: number;
+  updated: number;
+  skipped: number;
+  total: number;
+}
+
+// Сливаем импортируемые сессии с уже существующими по id. Если id новый —
+// добавляем; если совпал — заменяем (полезно, если пользователь
+// исправил данные на другом устройстве). Не валидные записи пропускаем.
+export function importBackup(raw: unknown, mode: "merge" | "replace" = "merge"): ImportResult {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Файл не похож на бэкап (ожидался JSON-объект).");
+  }
+  const data = raw as Partial<BackupFile>;
+  if (data.format !== BACKUP_FORMAT) {
+    throw new Error("Это не файл резервной копии Генератора тренировок.");
+  }
+  if (typeof data.version !== "number" || data.version > BACKUP_VERSION) {
+    throw new Error(
+      `Версия файла (${String(data.version)}) новее, чем поддерживает приложение. Обновите приложение.`,
+    );
+  }
+  if (!Array.isArray(data.sessions)) {
+    throw new Error("В файле нет списка тренировок.");
+  }
+  const existing = mode === "replace" ? [] : listSessions();
+  const byId = new Map<string, SessionLog>(existing.map((s) => [s.id, s]));
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const s of data.sessions) {
+    if (
+      !s ||
+      typeof s !== "object" ||
+      typeof s.id !== "string" ||
+      typeof s.ts !== "number" ||
+      typeof s.date !== "string" ||
+      !Array.isArray(s.exercises)
+    ) {
+      skipped++;
+      continue;
+    }
+    if (byId.has(s.id)) updated++;
+    else added++;
+    byId.set(s.id, s as SessionLog);
+  }
+  const merged = Array.from(byId.values()).sort((a, b) => a.ts - b.ts);
+  writeSessions(merged);
+  notifySessions();
+  return { added, updated, skipped, total: merged.length };
+}

@@ -15,6 +15,8 @@ import {
   deleteProfile,
   renameProfile,
   type Profile,
+} from "./lib/workout";
+import {
   type FormData,
   type Course,
   type CourseDays,
@@ -23,6 +25,11 @@ import {
   type WorkoutResult,
   exerciseCountRange,
 } from "@/lib/workout";
+import {
+  buildBackup,
+  importBackup,
+  type ImportResult,
+} from "@/lib/sessions";
 import { TrainingMode } from "@/components/TrainingMode";
 import { Analytics } from "@/components/Analytics";
 
@@ -624,15 +631,17 @@ function WelcomeScreen({
 
 function ProfileMenu({ profile }: { profile: Profile }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"menu" | "add" | "rename" | "confirm-delete">(
-    "menu",
-  );
+  const [view, setView] = useState<
+    "menu" | "add" | "rename" | "confirm-delete" | "import-result"
+  >("menu");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [profilesTick, setProfilesTick] = useState(0);
   void profilesTick;
   useEffect(() => subscribeProfiles(() => setProfilesTick((t) => t + 1)), []);
   const ref = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Закрытие при клике вне
   useEffect(() => {
@@ -658,6 +667,51 @@ function ProfileMenu({ profile }: { profile: Profile }) {
     setView("menu");
     setDraft("");
     setError(null);
+    setImportResult(null);
+  };
+
+  const onExport = () => {
+    try {
+      const backup = buildBackup(profile.name);
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = profile.name.replace(/[^\p{L}\p{N}_-]+/gu, "_") || "профиль";
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `workout-backup-${safeName}-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить файл");
+      setView("import-result");
+    }
+  };
+
+  const onPickImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // позволяем повторно выбрать тот же файл
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as unknown;
+      const res = importBackup(data, "merge");
+      setImportResult(res);
+      setError(null);
+      setView("import-result");
+    } catch (err) {
+      setImportResult(null);
+      setError(err instanceof Error ? err.message : "Не удалось прочитать файл");
+      setView("import-result");
+    }
   };
 
   const profiles = listProfiles();
@@ -775,7 +829,70 @@ function ProfileMenu({ profile }: { profile: Profile }) {
                   Удалить «{profile.name}»
                 </button>
               </div>
+
+              <div className="pt-1 mt-1 border-t space-y-0.5">
+                <p className="px-2 pt-1 pb-0.5 text-xs text-muted-foreground">
+                  Резервная копия
+                </p>
+                <button
+                  type="button"
+                  onClick={onExport}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                  title="Скачать всю историю в JSON-файл"
+                >
+                  Экспортировать историю
+                </button>
+                <button
+                  type="button"
+                  onClick={onPickImport}
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                  title="Загрузить историю из JSON-файла"
+                >
+                  Импортировать из файла…
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={onImportFile}
+                />
+              </div>
             </>
+          )}
+
+          {view === "import-result" && (
+            <div className="space-y-3">
+              {error ? (
+                <>
+                  <p className="text-sm font-semibold text-destructive">
+                    Не получилось импортировать
+                  </p>
+                  <p className="text-xs text-muted-foreground">{error}</p>
+                </>
+              ) : importResult ? (
+                <>
+                  <p className="text-sm font-semibold">Импорт завершён</p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5">
+                    <li>Добавлено новых: <b>{importResult.added}</b></li>
+                    <li>Обновлено существующих: <b>{importResult.updated}</b></li>
+                    {importResult.skipped > 0 && (
+                      <li>
+                        Пропущено повреждённых: <b>{importResult.skipped}</b>
+                      </li>
+                    )}
+                    <li>Всего тренировок в профиле: <b>{importResult.total}</b></li>
+                  </ul>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setView("menu")}
+                className="w-full rounded-md border bg-background py-2 text-sm hover:bg-muted/60"
+              >
+                Готово
+              </button>
+            </div>
           )}
 
           {view === "add" && (
