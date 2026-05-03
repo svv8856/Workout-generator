@@ -21,13 +21,28 @@ function parseWorkSeconds(sets: string): number | null {
   return m ? parseInt(m[1]!, 10) : null;
 }
 
-// Парсим отдых между подходами из строки restBetween (например «60–90 секунд»).
+// Парсим отдых между подходами из строки restBetween.
+// Примеры: «60–90 секунд», «1.5–2.5 минуты», «2–3 минуты (полное восстановление пульса)».
 function parseRestSeconds(restBetween: string): number {
-  const m = restBetween.match(/(\d+)\s*[–-]\s*(\d+)/);
-  if (m) return Math.round((parseInt(m[1]!, 10) + parseInt(m[2]!, 10)) / 2);
-  const single = restBetween.match(/(\d+)/);
-  if (single) return parseInt(single[1]!, 10);
-  return 75;
+  // Берём ПЕРВЫЙ диапазон или число, поддерживая десятичные (1.5).
+  const range = restBetween.match(
+    /(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)/,
+  );
+  let avg: number;
+  if (range) {
+    const a = parseFloat(range[1]!.replace(",", "."));
+    const b = parseFloat(range[2]!.replace(",", "."));
+    avg = (a + b) / 2;
+  } else {
+    const single = restBetween.match(/(\d+(?:[.,]\d+)?)/);
+    if (!single) return 75;
+    avg = parseFloat(single[1]!.replace(",", "."));
+  }
+  // Если в тексте написано «минут» — умножаем на 60.
+  const isMinutes = /мин/i.test(restBetween);
+  const sec = Math.round(avg * (isMinutes ? 60 : 1));
+  // Безопасный диапазон: 10 сек … 5 минут.
+  return Math.max(10, Math.min(300, sec));
 }
 
 function formatMMSS(sec: number): string {
