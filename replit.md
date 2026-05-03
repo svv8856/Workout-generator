@@ -16,6 +16,13 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Git Push
+
+When the user asks to push to git ("запушь", "push to git", и т.п.):
+- Always use `git push "$GIT_URL" main` — `GIT_URL` is a Replit-managed env var containing the authenticated GitHub URL with token for `svv8856/Workout-generator`.
+- Do NOT use `git push origin main` — origin lacks credentials and will fail with "Password authentication is not supported".
+- Never echo or log the value of `$GIT_URL` (it contains a token).
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
