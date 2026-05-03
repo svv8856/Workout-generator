@@ -42,6 +42,7 @@ export interface SessionLog {
   endTs?: number; // момент завершения (если завершена)
   durationPlanned: number; // мин (из формы)
   durationActual?: number; // мин (по факту: (endTs-ts)/60_000)
+  level?: "beginner" | "intermediate" | "advanced"; // уровень на момент тренировки
   focus: string; // фокус тренировки (из result.focusLabel)
   muscles: string[]; // нормализованные русские названия
   rpe?: number; // 1-10 субъективная нагрузка

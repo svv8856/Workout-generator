@@ -345,25 +345,75 @@ interface Recommendation {
   text: string;
 }
 
+// Определяем «текущий» уровень по последним тренировкам (если он сохранён).
+function currentLevel(
+  sessions: SessionLog[],
+): "beginner" | "intermediate" | "advanced" | null {
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    const lvl = sessions[i]!.level;
+    if (lvl) return lvl;
+  }
+  return null;
+}
+
 function analyzeForAdaptation(sessions: SessionLog[]): Recommendation[] {
   const recs: Recommendation[] = [];
   if (sessions.length < 3) return recs;
   const recent = sessions.slice(-6);
+  const lvl = currentLevel(sessions);
 
-  // 1. Высокий RPE стабильно
-  const rpes = recent.map((s) => s.rpe).filter((r): r is number => typeof r === "number");
+  // 1. Высокий / низкий RPE — советы зависят от уровня
+  const rpes = recent
+    .map((s) => s.rpe)
+    .filter((r): r is number => typeof r === "number");
   if (rpes.length >= 3) {
     const avg = rpes.reduce((a, b) => a + b, 0) / rpes.length;
     if (avg >= 8.5) {
-      recs.push({
-        level: "warn",
-        text: `Средний RPE последних тренировок ${avg.toFixed(1)} из 10 — нагрузка стабильно тяжёлая. Рекомендуем неделю восстановления или выбрать на уровень меньше.`,
-      });
+      // Тяжело. Если уже начинающий — никаких «ниже уровня», даём конкретику.
+      if (lvl === "beginner" || lvl === null) {
+        recs.push({
+          level: "warn",
+          text:
+            `Средний RPE ${avg.toFixed(1)} из 10 — каждая тренировка идёт «на пределе». Что попробовать на этой неделе: ` +
+            `1) сократите рабочие веса на 20–30% и сосредоточьтесь на технике; ` +
+            `2) увеличьте отдых между подходами до 90–120 секунд; ` +
+            `3) уменьшите длительность тренировки на 10–15 минут; ` +
+            `4) проверьте сон (нужно 7–9 ч) и питание (≥1.6 г белка на кг веса). ` +
+            `Если ощущения не изменятся за неделю — возьмите 3–4 дня полного отдыха.`,
+        });
+      } else if (lvl === "intermediate") {
+        recs.push({
+          level: "warn",
+          text:
+            `Средний RPE ${avg.toFixed(1)} из 10 — нагрузка стабильно тяжёлая. Варианты: ` +
+            `неделя разгрузки (веса −30–40% или подходы вдвое), либо переключитесь на уровень «начинающий» на 1–2 недели — это даст накопленной усталости уйти, не теряя формы.`,
+        });
+      } else {
+        recs.push({
+          level: "warn",
+          text:
+            `Средний RPE ${avg.toFixed(1)} из 10. На уровне «продвинутый» это сигнал к плановой разгрузке: ` +
+            `неделя на 60% от рабочих весов, либо переключение на уровень «средний» с акцентом на технику и подвижность.`,
+        });
+      }
     } else if (avg <= 4) {
-      recs.push({
-        level: "info",
-        text: `Средний RPE ${avg.toFixed(1)} из 10 — нагрузка субъективно лёгкая. Можно увеличить веса или перейти на уровень выше.`,
-      });
+      if (lvl === "advanced") {
+        recs.push({
+          level: "info",
+          text:
+            `Средний RPE ${avg.toFixed(1)} из 10 — слишком легко для уровня «продвинутый». ` +
+            `Поднимите рабочие веса на 5–10% или добавьте по одному подходу к базовым движениям.`,
+        });
+      } else {
+        recs.push({
+          level: "info",
+          text:
+            `Средний RPE ${avg.toFixed(1)} из 10 — субъективно легко. ` +
+            `Можно увеличить рабочие веса на 5–10% или ${
+              lvl === "beginner" ? "перейти на уровень «средний»" : "перейти на уровень «продвинутый»"
+            }.`,
+        });
+      }
     }
   }
 
@@ -375,12 +425,12 @@ function analyzeForAdaptation(sessions: SessionLog[]): Recommendation[] {
     if (avg <= 0.7) {
       recs.push({
         level: "info",
-        text: `Тренировки в среднем на ${Math.round((1 - avg) * 100)}% короче плана. Попробуйте выбрать длительность поменьше — это сэкономит время.`,
+        text: `Тренировки в среднем на ${Math.round((1 - avg) * 100)}% короче плана. Можно либо выбрать длительность поменьше (сэкономит время), либо добавить 1–2 подхода к ключевым упражнениям.`,
       });
     } else if (avg >= 1.25) {
       recs.push({
         level: "warn",
-        text: `Тренировки в среднем на ${Math.round((avg - 1) * 100)}% длиннее плана. Возможно, стоит выбрать длительность побольше или сократить количество подходов.`,
+        text: `Тренировки в среднем на ${Math.round((avg - 1) * 100)}% длиннее плана. Сократите отдых между подходами на 15–30 секунд, либо выберите длительность побольше — иначе будете спешить и портить технику.`,
       });
     }
   }
@@ -391,14 +441,23 @@ function analyzeForAdaptation(sessions: SessionLog[]): Recommendation[] {
   if (totalPlanned > 0) {
     const ratio = totalDone / totalPlanned;
     if (ratio < 0.7) {
-      recs.push({
-        level: "warn",
-        text: `Выполняете в среднем ${Math.round(ratio * 100)}% запланированных подходов. Возможно, текущий уровень слишком тяжёлый — попробуйте на ступень ниже.`,
-      });
+      if (lvl === "beginner" || lvl === null) {
+        recs.push({
+          level: "warn",
+          text:
+            `Выполняете лишь ${Math.round(ratio * 100)}% запланированных подходов. ` +
+            `Сократите длительность тренировки или количество упражнений в форме — лучше регулярно делать меньше, чем эпизодически выгорать.`,
+        });
+      } else {
+        recs.push({
+          level: "warn",
+          text: `Выполняете в среднем ${Math.round(ratio * 100)}% запланированных подходов — текущий уровень слишком тяжёлый. Попробуйте уровень ниже на 2–3 недели.`,
+        });
+      }
     } else if (ratio >= 0.95) {
       recs.push({
         level: "good",
-        text: `Выполняете ${Math.round(ratio * 100)}% подходов — отличная стабильность. Можно постепенно увеличивать рабочие веса.`,
+        text: `Выполняете ${Math.round(ratio * 100)}% подходов — отличная стабильность. Можно постепенно увеличивать рабочие веса (по 2.5 кг каждые 1–2 недели на базовых движениях).`,
       });
     }
   }
@@ -411,9 +470,24 @@ function analyzeForAdaptation(sessions: SessionLog[]): Recommendation[] {
     if (top.sets / total > 0.5) {
       recs.push({
         level: "warn",
-        text: `За последние 30 дней более ${Math.round((top.sets / total) * 100)}% подходов пришлось на «${top.muscle}». Стоит больше внимания уделить остальным группам мышц.`,
+        text: `За последние 30 дней более ${Math.round((top.sets / total) * 100)}% подходов пришлось на «${top.muscle}». Чтобы выровнять, выберите фокус «${oppositeFocus(top.muscle)}» в форме на следующих 2–3 тренировках.`,
       });
     }
+  }
+
+  // 5. Частота тренировок (кол-во за последние 14 дней)
+  const cutoff14 = Date.now() - 14 * 24 * 3600 * 1000;
+  const recent14 = sessions.filter((s) => s.ts >= cutoff14).length;
+  if (recent14 === 0) {
+    recs.push({
+      level: "info",
+      text: "За последние 2 недели завершённых тренировок нет. Даже одна короткая сессия в неделю лучше, чем длинный перерыв — попробуйте 20–25 минут на ближайший день.",
+    });
+  } else if (recent14 >= 8) {
+    recs.push({
+      level: "warn",
+      text: `За 2 недели — ${recent14} тренировок. Это много даже для продвинутых: оставьте минимум 1 полный день отдыха между силовыми, иначе восстановление и прогресс встанут.`,
+    });
   }
 
   if (recs.length === 0) {
@@ -423,6 +497,15 @@ function analyzeForAdaptation(sessions: SessionLog[]): Recommendation[] {
     });
   }
   return recs;
+}
+
+// Подсказываем «противоположный» фокус по перекосу — простая мапа.
+function oppositeFocus(muscle: string): string {
+  const m = muscle.toLowerCase();
+  if (m.includes("грудь") || m.includes("плеч") || m.includes("трицеп")) return "Pull (спина + бицепс)";
+  if (m.includes("спин") || m.includes("бицеп")) return "Push (грудь + плечи + трицепс)";
+  if (m.includes("ног") || m.includes("ягод")) return "Push или Pull (верх тела)";
+  return "противоположную группу мышц";
 }
 
 // =====================================================================
@@ -726,8 +809,8 @@ export function Analytics() {
       {/* Pro: рекомендации */}
       <ProCard
         pro={pro}
-        title="Что подкрутить"
-        subtitle="Автоматический анализ последних 6 тренировок"
+        title="Рекомендации тренера"
+        subtitle="Конкретные советы по последним 6 тренировкам — что сделать на следующей неделе"
       >
         <ul className="space-y-2">
           {recs.map((r, i) => (

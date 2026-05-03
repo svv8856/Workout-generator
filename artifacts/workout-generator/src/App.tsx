@@ -126,6 +126,7 @@ function MainApp({
   const [training, setTraining] = useState<{
     result: WorkoutResult;
     duration: number;
+    level: "beginner" | "intermediate" | "advanced";
   } | null>(null);
   // historyTick triggers re-read of history after mutations
   void historyTick;
@@ -445,7 +446,7 @@ function MainApp({
               <button
                 type="button"
                 onClick={() =>
-                  setTraining({ result, duration: form.duration })
+                  setTraining({ result, duration: form.duration, level: form.level })
                 }
                 className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-3 text-sm font-semibold text-white transition"
               >
@@ -489,6 +490,7 @@ function MainApp({
         <TrainingMode
           result={training.result}
           duration={training.duration}
+          level={training.level}
           onClose={(saved) => {
             setTraining(null);
             if (saved) setTab("analytics");

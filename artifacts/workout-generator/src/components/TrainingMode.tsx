@@ -93,10 +93,12 @@ interface ExerciseState {
 export function TrainingMode({
   result,
   duration,
+  level,
   onClose,
 }: {
   result: WorkoutResult;
   duration: number;
+  level?: "beginner" | "intermediate" | "advanced";
   onClose: (saved: boolean) => void;
 }) {
   // Глобальный отдых (фолбэк, если в схеме упражнения отдыха нет).
@@ -313,6 +315,7 @@ export function TrainingMode({
       endTs,
       durationPlanned: duration,
       durationActual: Math.max(1, Math.round((endTs - startTs) / 60000)),
+      level,
       focus: result.focusLabel ?? "Тренировка",
       muscles: Array.from(new Set(exercises.map((e) => e.muscle))),
       rpe,
