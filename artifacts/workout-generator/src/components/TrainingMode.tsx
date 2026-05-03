@@ -7,6 +7,12 @@ import {
   newSessionId,
   saveSession,
 } from "@/lib/sessions";
+import {
+  hapticSuccess,
+  keepScreenAwake,
+  scheduleRestDoneNotification,
+  cancelRestNotification,
+} from "@/lib/native";
 
 // Парсим количество подходов из строки схемы — формат «N подходов … ».
 function parseSetsCount(sets: string): number {
@@ -234,6 +240,10 @@ export function TrainingMode({
     } catch {}
   }
 
+  // ID запланированного нативного уведомления (Android), чтобы можно было
+  // его отменить, если пользователь остановил таймер раньше.
+  const restNotifyIdRef = useRef<number | null>(null);
+
   // Тикер таймеров — 1 секунда.
   useEffect(() => {
     if (timerMode === null) return;
@@ -241,6 +251,11 @@ export function TrainingMode({
       setCountdown((c) => {
         if (c <= 1) {
           beep();
+          // Виброотклик в момент конца таймера — заметнее, чем звук, если
+          // телефон в кармане или в шумном зале.
+          void hapticSuccess();
+          // Уведомление уже сработало само в системе — просто очистим id.
+          restNotifyIdRef.current = null;
           if (tickRef.current !== null) {
             window.clearInterval(tickRef.current);
             tickRef.current = null;
@@ -270,9 +285,34 @@ export function TrainingMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerMode]);
 
+  // Удерживаем экран включённым всё время, пока открыт режим тренировки.
+  // На вебе — Wake Lock API (Android Chrome), на нативе — Capacitor KeepAwake.
+  useEffect(() => {
+    void keepScreenAwake(true);
+    return () => {
+      void keepScreenAwake(false);
+      // На всякий случай отменяем любое запланированное уведомление,
+      // если пользователь резко закрыл режим в середине отдыха.
+      void cancelRestNotification(restNotifyIdRef.current);
+      restNotifyIdRef.current = null;
+    };
+  }, []);
+
+  // При запуске любого таймера отдыха планируем нативное уведомление,
+  // чтобы пользователь узнал об окончании отдыха, даже если свернул
+  // приложение или экран погас (на iOS/Android фоновый JS таймер не работает).
+  function armRestNotification(secs: number) {
+    void cancelRestNotification(restNotifyIdRef.current);
+    restNotifyIdRef.current = null;
+    void scheduleRestDoneNotification(secs).then((id) => {
+      restNotifyIdRef.current = id;
+    });
+  }
+
   function startRestTimer() {
     setTimerMode("rest");
     setCountdown(restSec);
+    armRestNotification(restSec);
   }
 
   function startWorkTimer() {
@@ -284,6 +324,8 @@ export function TrainingMode({
   function stopTimer() {
     setTimerMode(null);
     setCountdown(0);
+    void cancelRestNotification(restNotifyIdRef.current);
+    restNotifyIdRef.current = null;
   }
 
   // Закрытие подхода: вручную или по тайму.
@@ -301,12 +343,15 @@ export function TrainingMode({
     if (willHaveMore) {
       setTimerMode("rest");
       setCountdown(restSec);
+      armRestNotification(restSec);
     } else {
       // Все подходы выполнены. Если есть следующее упражнение —
       // запускаем таймер межупражненческого отдыха, иначе просто гасим.
       if (currentIdx + 1 < exercises.length) {
+        const inter = restBeforeNext(currentIdx + 1);
         setTimerMode("interExercise");
-        setCountdown(restBeforeNext(currentIdx + 1));
+        setCountdown(inter);
+        armRestNotification(inter);
       } else {
         setTimerMode(null);
         setCountdown(0);
