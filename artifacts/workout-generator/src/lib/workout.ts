@@ -986,6 +986,7 @@ function fitExercisesToDuration(
   exercises: ExerciseOut[],
   pool: Exercise[],
   f: FormData,
+  allowedMuscles: Set<Muscle> | null,
 ): void {
   const MAX_SETS = 6;
   const MIN_SETS = 2;
@@ -1019,9 +1020,12 @@ function fitExercisesToDuration(
         );
         continue;
       }
-      // Все упражнения на потолке — добивка из пула.
+      // Все упражнения на потолке — добивка из пула, но только из мышц
+      // текущего фокуса (иначе в «Ноги» прилетит упражнение на плечи).
       const candidate = shuffle(pool).find(
-        (e) => !picked.some((p) => p.name === e.name),
+        (e) =>
+          !picked.some((p) => p.name === e.name) &&
+          (!allowedMuscles || allowedMuscles.has(e.muscle)),
       );
       if (!candidate) return; // пул исчерпан
       picked.push(candidate);
@@ -1492,6 +1496,9 @@ export function generateWorkout(f: FormData): WorkoutResult {
   let focusLabel: string | undefined;
   let focusNote: string | undefined;
   let picked: Exercise[];
+  // Какие мышцы разрешено добирать при подгонке времени (фит-итерациях).
+  // null = разрешены все (для общего «Всё тело» фолбэка).
+  let allowedMuscles: Set<Muscle> | null = null;
 
   // Фокус считаем валидным, если в пуле есть упражнения хотя бы для
   // большинства основных мышц шаблона (для шаблонов из 2 мышц — обе,
@@ -1544,6 +1551,11 @@ export function generateWorkout(f: FormData): WorkoutResult {
       Math.min(target, pool.length),
       choice.t.filler,
     );
+    // Запоминаем разрешённые мышцы для дальнейшей подгонки времени.
+    allowedMuscles = new Set<Muscle>([
+      ...choice.t.primary,
+      ...choice.t.filler,
+    ]);
 
     // Заголовок строим из фактически отобранных основных мышц, а не из шаблона.
     const usedPrimary = choice.t.primary.filter((m) =>
@@ -1731,7 +1743,7 @@ export function generateWorkout(f: FormData): WorkoutResult {
 
   // Итеративно подгоняем тренировку под выбранное окно длительности:
   // докидываем подходы / упражнения если коротко, или убираем если длинно.
-  fitExercisesToDuration(picked, exercises, pool, f);
+  fitExercisesToDuration(picked, exercises, pool, f, allowedMuscles);
 
   // Реальная оценка времени тренировки — для сравнения с f.duration в UI
   const estimatedMinutes = estimateWorkoutMinutes(exercises);
