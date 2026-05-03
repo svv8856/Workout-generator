@@ -94,6 +94,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "@clerk/react": "^6.4.2",
     "@clerk/themes": "^2.4.57"
   }

@@ -670,18 +670,40 @@ function ProfileMenu({ profile }: { profile: Profile }) {
     setImportResult(null);
   };
 
-  const onExport = () => {
+  const onExport = async () => {
     try {
       const backup = buildBackup(profile.name);
-      const blob = new Blob([JSON.stringify(backup, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const json = JSON.stringify(backup, null, 2);
       const safeName = profile.name.replace(/[^\p{L}\p{N}_-]+/gu, "_") || "профиль";
       const date = new Date().toISOString().slice(0, 10);
+      const fileName = `workout-backup-${safeName}-${date}.json`;
+
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform()) {
+        const { Filesystem, Directory, Encoding } = await import(
+          "@capacitor/filesystem"
+        );
+        const { Share } = await import("@capacitor/share");
+        const writeRes = await Filesystem.writeFile({
+          path: fileName,
+          data: json,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+        await Share.share({
+          title: "Резервная копия тренировок",
+          text: fileName,
+          url: writeRes.uri,
+          dialogTitle: "Сохранить резервную копию",
+        });
+        return;
+      }
+
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `workout-backup-${safeName}-${date}.json`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
