@@ -53,6 +53,50 @@ function parseWeightKg(weight?: string): number | null {
 //   «3 подхода по 30 сек · отдых между подходами 45 сек» → 45
 //   «1.5–2.5 минуты» → 120
 //   «60–90 секунд» → 75
+// Базовые многосуставные движения, для которых имеет смысл удлинять отдых.
+const HEAVY_LIFT_KEYWORDS = [
+  "жим штанги",
+  "жим гантел",
+  "жим лёжа",
+  "жим лежа",
+  "присед",
+  "становая",
+  "тяга штанги",
+  "тяга гантел",
+  "тяга в наклоне",
+  "подтягив",
+  "выпад",
+  "швунг",
+  "толчок",
+  "рывок",
+  "армейский жим",
+];
+
+function isHeavyBaseLift(name: string): boolean {
+  const n = name.toLowerCase();
+  return HEAVY_LIFT_KEYWORDS.some((k) => n.includes(k));
+}
+
+function hasWeight(weight?: string): boolean {
+  if (!weight) return false;
+  // Игнорируем «без веса» / «свой вес» / пустую строку
+  if (/без\s+вес|свой\s+вес/i.test(weight)) return false;
+  return /\d/.test(weight);
+}
+
+// Парсит верхнюю границу «тяжёлого» отдыха из текста типа
+// «60–90 секунд (можно до 2–3 мин на тяжёлых базовых)».
+// Возвращает секунды или null, если такой части нет.
+function parseHeavyRestSeconds(text: string): number | null {
+  const m = text.match(/до\s+(\d+(?:[.,]\d+)?)(?:\s*[–-]\s*(\d+(?:[.,]\d+)?))?\s*(сек|мин)/i);
+  if (!m) return null;
+  const a = parseFloat(m[1]!.replace(",", "."));
+  const b = m[2] ? parseFloat(m[2]!.replace(",", ".")) : a;
+  const avg = (a + b) / 2;
+  const isMinutes = /мин/i.test(m[3]!);
+  return Math.max(30, Math.min(300, Math.round(avg * (isMinutes ? 60 : 1))));
+}
+
 function parseRestSeconds(text: string): number {
   // 1) Ищем фрагмент после слова «отдых» — он самый надёжный.
   const restPart = text.match(/отдых[^\d]*(\d[^·\n]*)/i);
@@ -113,11 +157,28 @@ export function TrainingMode({
     () => parseRestSeconds(result.restBetween),
     [result.restBetween],
   );
-  // Отдых между упражнениями — берём из общей строки.
-  const interExerciseRestSec = useMemo(
+  // Отдых между упражнениями — адаптивный.
+  // Базовый отдых из общей строки тренировки (например «60–90 секунд»).
+  const baseInterRestSec = useMemo(
     () => parseRestSeconds(result.restBetween),
     [result.restBetween],
   );
+  // Если у строки отдыха есть верхняя граница (например «до 2–3 мин»), берём её
+  // как «тяжёлый» лимит для базовых движений; иначе по умолчанию 150 сек.
+  const heavyInterRestSec = useMemo(
+    () => parseHeavyRestSeconds(result.restBetween) ?? 150,
+    [result.restBetween],
+  );
+  // Подбираем отдых перед следующим упражнением: если оно базовое (жим/присед/
+  // тяга/подтяг и т.п.) с указанным рабочим весом — даём больше; иначе обычный.
+  function restBeforeNext(nextIdx: number): number {
+    const ex = result.exercises[nextIdx];
+    if (!ex) return baseInterRestSec;
+    if (isHeavyBaseLift(ex.name) && hasWeight(ex.weight)) {
+      return heavyInterRestSec;
+    }
+    return baseInterRestSec;
+  }
 
   const [startTs] = useState(() => Date.now());
   const [sessionId] = useState(() => newSessionId());
@@ -245,7 +306,7 @@ export function TrainingMode({
       // запускаем таймер межупражненческого отдыха, иначе просто гасим.
       if (currentIdx + 1 < exercises.length) {
         setTimerMode("interExercise");
-        setCountdown(interExerciseRestSec);
+        setCountdown(restBeforeNext(currentIdx + 1));
       } else {
         setTimerMode(null);
         setCountdown(0);
