@@ -181,19 +181,20 @@ export function saveReminderTime(t: ReminderTime | null): void {
 }
 
 export async function scheduleDailyReminder(hour: number, min: number): Promise<void> {
+  // Сбрасываем кэш разрешений — вдруг пользователь только что включил их в настройках
+  notificationsReady = null;
   if (!(await ensureNotificationPermission())) return;
   try {
     await LocalNotifications.cancel({ notifications: [{ id: DAILY_REMINDER_ID }] });
-    const now = new Date();
-    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min, 0);
-    if (at <= now) at.setDate(at.getDate() + 1);
     await LocalNotifications.schedule({
       notifications: [
         {
           id: DAILY_REMINDER_ID,
           title: "Время тренироваться",
           body: "Не пропусти тренировку — ты молодец, что держишь режим!",
-          schedule: { at, repeats: true, every: "day" },
+          // schedule.on с hour/minute — самый надёжный режим для ежедневного напоминания.
+          // allowWhileIdle гарантирует доставку даже если устройство в Doze-режиме.
+          schedule: { on: { hour, minute: min }, allowWhileIdle: true },
           smallIcon: "ic_stat_icon_config_sample",
           autoCancel: true,
         },
