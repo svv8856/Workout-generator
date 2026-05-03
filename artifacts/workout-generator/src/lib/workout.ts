@@ -464,6 +464,25 @@ function ageMetabolismFactor(age: number): number {
   return 0.8;
 }
 
+// Коэффициент силы по полу для конкретной группы мышц.
+// Мужчина — 1.0 везде. Женщина: верх 0.65, низ 0.80, кор/общее 0.75.
+function genderFactor(muscle: Muscle, gender: Gender): number {
+  if (gender === "male") return 1.0;
+  switch (muscle) {
+    case "chest":
+    case "back":
+    case "shoulders":
+    case "biceps":
+    case "triceps":
+      return 0.65; // верх тела
+    case "legs":
+    case "glutes":
+      return 0.8; // низ тела
+    default:
+      return 0.75; // core, fullbody, cardio
+  }
+}
+
 function recommendWeight(
   ex: Exercise,
   f: FormData,
@@ -485,8 +504,13 @@ function recommendWeight(
 
   // Поправка на уровень
   const lvl = { beginner: 0.7, intermediate: 1.0, advanced: 1.3 }[f.level];
-  // Поправка на пол
-  const gen = f.gender === "female" ? 0.7 : 1.0;
+  // Поправка на пол с учётом верх/низ тела.
+  // По данным исследований силовой подготовки женщины в среднем
+  // составляют ~60–70% от мужской силы в верхнем теле и ~70–80%
+  // в нижнем (нижнее тело относительно сильнее благодаря большей
+  // мышечной массе бёдер и ягодиц). Раньше использовался единый
+  // коэффициент 0.7, что недооценивало силу женских ног.
+  const gen = genderFactor(ex.muscle, f.gender);
   // Поправка на цель (выносливость / жиросжигание — легче)
   const goal =
     f.goal === "strength" ? 1.0 : f.goal === "endurance" ? 0.75 : 0.85;
