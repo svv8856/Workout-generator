@@ -78,6 +78,11 @@ export function TrainingMode({
     () => parseRestSeconds(result.restBetween),
     [result.restBetween],
   );
+  // Отдых между упражнениями — берём из общей строки.
+  const interExerciseRestSec = useMemo(
+    () => parseRestSeconds(result.restBetween),
+    [result.restBetween],
+  );
 
   const [startTs] = useState(() => Date.now());
   const [sessionId] = useState(() => newSessionId());
@@ -89,7 +94,9 @@ export function TrainingMode({
     })),
   );
   // Активный таймер: 'rest' | 'work' | null. countdown = оставшиеся секунды.
-  const [timerMode, setTimerMode] = useState<"rest" | "work" | null>(null);
+  const [timerMode, setTimerMode] = useState<
+    "rest" | "work" | "interExercise" | null
+  >(null);
   const [countdown, setCountdown] = useState(0);
   const tickRef = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -145,8 +152,12 @@ export function TrainingMode({
           if (timerMode === "work") {
             // Закончили рабочий подход — отмечаем set done, переходим в отдых
             doSetDone(true);
+          } else if (timerMode === "interExercise") {
+            // Закончился межупражненческий отдых — авто-переход к следующему
+            setTimerMode(null);
+            goNext();
           } else {
-            // Закончили отдых — просто гасим таймер
+            // Закончили отдых между подходами — просто гасим таймер
             setTimerMode(null);
           }
           return 0;
@@ -195,9 +206,15 @@ export function TrainingMode({
       setTimerMode("rest");
       setCountdown(restSec);
     } else {
-      // Все подходы выполнены — гасим таймер в любом случае
-      setTimerMode(null);
-      setCountdown(0);
+      // Все подходы выполнены. Если есть следующее упражнение —
+      // запускаем таймер межупражненческого отдыха, иначе просто гасим.
+      if (currentIdx + 1 < exercises.length) {
+        setTimerMode("interExercise");
+        setCountdown(interExerciseRestSec);
+      } else {
+        setTimerMode(null);
+        setCountdown(0);
+      }
     }
     void viaTimer;
   }
@@ -402,23 +419,41 @@ export function TrainingMode({
           {timerMode !== null && (
             <div
               className={`rounded-xl p-5 text-center border-2 ${
-                timerMode === "rest"
-                  ? "border-sky-500/40 bg-sky-500/10"
-                  : "border-emerald-500/40 bg-emerald-500/10"
+                timerMode === "work"
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : timerMode === "interExercise"
+                    ? "border-amber-500/40 bg-amber-500/10"
+                    : "border-sky-500/40 bg-sky-500/10"
               }`}
             >
               <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                {timerMode === "rest" ? "Отдых" : "Делайте упражнение"}
+                {timerMode === "work"
+                  ? "Делайте упражнение"
+                  : timerMode === "interExercise"
+                    ? "Отдых перед следующим упражнением"
+                    : "Отдых между подходами"}
               </div>
               <div className="text-5xl sm:text-6xl font-bold tabular-nums">
                 {formatMMSS(countdown)}
               </div>
               <button
                 type="button"
-                onClick={stopTimer}
+                onClick={
+                  timerMode === "interExercise"
+                    ? () => {
+                        setTimerMode(null);
+                        setCountdown(0);
+                        goNext();
+                      }
+                    : stopTimer
+                }
                 className="mt-3 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
               >
-                {timerMode === "rest" ? "Продолжить раньше" : "Остановить таймер"}
+                {timerMode === "work"
+                  ? "Остановить таймер"
+                  : timerMode === "interExercise"
+                    ? "К следующему упражнению"
+                    : "Продолжить раньше"}
               </button>
             </div>
           )}
