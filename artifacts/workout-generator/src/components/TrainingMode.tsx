@@ -21,11 +21,18 @@ function parseWorkSeconds(sets: string): number | null {
   return m ? parseInt(m[1]!, 10) : null;
 }
 
-// Парсим отдых между подходами из строки restBetween.
-// Примеры: «60–90 секунд», «1.5–2.5 минуты», «2–3 минуты (полное восстановление пульса)».
-function parseRestSeconds(restBetween: string): number {
-  // Берём ПЕРВЫЙ диапазон или число, поддерживая десятичные (1.5).
-  const range = restBetween.match(
+// Парсим отдых из строки.
+// Примеры:
+//   «4 подхода по 8–10 повторений · отдых между подходами 60 сек» → 60
+//   «3 подхода по 30 сек · отдых между подходами 45 сек» → 45
+//   «1.5–2.5 минуты» → 120
+//   «60–90 секунд» → 75
+function parseRestSeconds(text: string): number {
+  // 1) Ищем фрагмент после слова «отдых» — он самый надёжный.
+  const restPart = text.match(/отдых[^\d]*(\d[^·\n]*)/i);
+  const target = restPart ? restPart[1]! : text;
+  // 2) В этом фрагменте берём диапазон или одиночное число (с десятичной).
+  const range = target.match(
     /(\d+(?:[.,]\d+)?)\s*[–-]\s*(\d+(?:[.,]\d+)?)/,
   );
   let avg: number;
@@ -34,14 +41,14 @@ function parseRestSeconds(restBetween: string): number {
     const b = parseFloat(range[2]!.replace(",", "."));
     avg = (a + b) / 2;
   } else {
-    const single = restBetween.match(/(\d+(?:[.,]\d+)?)/);
+    const single = target.match(/(\d+(?:[.,]\d+)?)/);
     if (!single) return 75;
     avg = parseFloat(single[1]!.replace(",", "."));
   }
-  // Если в тексте написано «минут» — умножаем на 60.
-  const isMinutes = /мин/i.test(restBetween);
+  // 3) Единицы определяем по фрагменту, иначе по всей строке.
+  const unitText = restPart ? target : text;
+  const isMinutes = /мин/i.test(unitText);
   const sec = Math.round(avg * (isMinutes ? 60 : 1));
-  // Безопасный диапазон: 10 сек … 5 минут.
   return Math.max(10, Math.min(300, sec));
 }
 
