@@ -71,6 +71,16 @@ const labels = {
   place: { home: "Дом", gym: "Зал", outdoor: "Улица" } as const,
 };
 
+// Текстовый диапазон количества упражнений в зависимости от выбранной
+// длительности — должен совпадать с targetForDuration() в lib/workout.ts.
+function exerciseRangeFor(duration: number): string {
+  if (duration <= 20) return "3–4";
+  if (duration <= 35) return "4–5";
+  if (duration <= 60) return "5–6";
+  if (duration <= 90) return "6–7";
+  return "8";
+}
+
 function App() {
   const [theme, setTheme] = useTheme();
   const [activeProfile, setActiveProfileState] = useState<Profile | null>(() =>
@@ -145,7 +155,8 @@ function MainApp({
               Генератор тренировок
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Подберём 5–6 упражнений под вашу цель, уровень и место занятий.
+              Подберём {exerciseRangeFor(form.duration)} упражнений под вашу
+              цель, уровень и место занятий.
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
