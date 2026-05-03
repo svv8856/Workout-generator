@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   appId: "ru.workoutgenerator.app",
   appName: "Генератор тренировок",
   // Папка, куда vite кладёт собранный фронтенд.
-  webDir: "dist",
+  webDir: "dist/public",
   // Светлая/тёмная адаптация системного бара.
   android: {
     backgroundColor: "#ffffff",
